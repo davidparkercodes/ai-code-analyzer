@@ -1,0 +1,14 @@
+[package]
+name = "code-analyzer"
+version = "0.1.0"
+edition = "2024"
+description = "AI-Powered Codebase Analysis Tool"
+authors = ["Your Name <your.email@example.com>"]
+
+[[bin]]
+name = "codeanalyzer"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.2", features = ["derive"] }
+walkdir = "2.4.0"
