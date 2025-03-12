@@ -45,7 +45,7 @@ fn list_files_and_directories(dir_path: &str) {
     for entry in WalkDir::new(path).max_depth(1).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.to_string_lossy() == dir_path {
-            continue; // Skip the root directory itself
+            continue;
         }
         
         let file_type = if path.is_dir() { "Directory" } else { "File" };
