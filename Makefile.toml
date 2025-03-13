@@ -46,6 +46,16 @@ description = "Run all tests"
 command = "cargo"
 args = ["test"]
 
+[tasks.test-unit]
+description = "Run unit tests"
+command = "cargo"
+args = ["test", "--", "--nocapture"]
+
+[tasks.install-pre-commit]
+description = "Install pre-commit hooks"
+command = "pre-commit"
+args = ["install"]
+
 [tasks.lint]
 description = "Run clippy to lint code"
 command = "cargo"
