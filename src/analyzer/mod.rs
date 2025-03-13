@@ -10,6 +10,12 @@ pub struct Analyzer {
     reporter: MetricsReporter,
 }
 
+impl Default for Analyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Analyzer {
     pub fn new() -> Self {
         Analyzer {

@@ -7,6 +7,12 @@ pub struct MetricsCollector {
     file_analyzer: FileAnalyzer,
 }
 
+impl Default for MetricsCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetricsCollector {
     pub fn new() -> Self {
         MetricsCollector {

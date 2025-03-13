@@ -1,5 +1,11 @@
 pub struct LanguageDetector;
 
+impl Default for LanguageDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LanguageDetector {
     pub fn new() -> Self {
         LanguageDetector

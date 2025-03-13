@@ -3,6 +3,12 @@ use crate::output::style::*;
 
 pub struct MetricsReporter;
 
+impl Default for MetricsReporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetricsReporter {
     pub fn new() -> Self {
         MetricsReporter

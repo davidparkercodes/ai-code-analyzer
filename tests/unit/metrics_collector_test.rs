@@ -60,7 +60,7 @@ fn test_collect_metrics() {
 
     let metrics = result.unwrap();
 
-    // We should have 3 files and 3 directories (root, src, src/utils, tests)
+    // We should have 3 files and 4 directories (root, src, src/utils, tests)
     assert_eq!(metrics.total_files, 3);
     assert_eq!(metrics.total_directories, 4); // temp_dir, src, src/utils, tests
 
