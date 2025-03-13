@@ -28,16 +28,8 @@ impl StyleReport {
         self.language_stats.insert(language.to_string(), file_count);
     }
 
-    pub fn get_patterns(&self) -> &[StylePattern] {
-        &self.patterns
-    }
-
-    pub fn get_patterns_by_language(&self, language: &str) -> Vec<&StylePattern> {
-        self.patterns
-            .iter()
-            .filter(|p| p.language == language)
-            .collect()
-    }
+    // These methods are removed as they're currently unused
+    // If needed in the future, uncomment and implement
 
     pub fn get_dominant_patterns(&self) -> Vec<&StylePattern> {
         let mut result = Vec::new();

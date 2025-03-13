@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 /// Represents a coding style rule that can be detected and enforced
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)] // Some variants reserved for future use
 pub enum StyleRule {
     // Naming conventions
     NamingConvention(NamingConvention),
@@ -58,6 +59,7 @@ impl StylePattern {
 
 /// Naming convention patterns
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)] // Some variants reserved for future use
 pub enum NamingConvention {
     CamelCase,
     PascalCase,
@@ -85,6 +87,7 @@ pub enum BracketStyle {
 
 /// File organization patterns
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)] // Some variants reserved for future use
 pub enum FileOrganization {
     ImportsFirst,
     TypesBeforeFunctions,
@@ -121,9 +124,6 @@ impl StylePatternCollection {
         }
     }
     
-    pub fn get_all_patterns(&self) -> Vec<&StylePattern> {
-        self.patterns.values()
-            .flat_map(|language_patterns| language_patterns.values())
-            .collect()
-    }
+    // Method removed as it's currently unused
+    // If needed in the future, uncomment and implement
 }
