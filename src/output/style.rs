@@ -194,6 +194,16 @@ pub fn highlight(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
+pub fn bold(text: &str) -> StyledText {
+    StyledText::new(text)
+        .style(Style::Bold)
+}
+
+pub fn dimmed(text: &str) -> StyledText {
+    StyledText::new(text)
+        .style(Style::Dim)
+}
+
 // Print helpers
 pub fn print_header(text: &str) {
     println!("{}", header(text));

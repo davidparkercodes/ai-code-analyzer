@@ -22,7 +22,8 @@ fn test_clean_comments_from_rust_files() {
         Some(output_path.clone()),
         true, // no_parallel = true
         true, // no_git = true
-        true  // force = true
+        true, // force = true
+        false // dry_run = false
     );
     
     // Verify success
@@ -59,6 +60,39 @@ fn test_clean_comments_from_rust_files() {
     assert!(!cleaned_file3.contains("// This comment will be removed"));
     assert!(cleaned_file3.contains("// aicodeanalyzer: ignore"));
     assert!(!cleaned_file3.contains("// This comment will be removed"));
+}
+
+#[test]
+fn test_dry_run_mode() {
+    // Create a temporary directory
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+    
+    // Create test Rust files with comments
+    create_test_files(temp_path);
+    
+    // Path to first test file
+    let test_file_path = temp_path.join("test1.rs");
+    let original_content = fs::read_to_string(&test_file_path).unwrap();
+    
+    // Run the clean_comments command with dry_run = true
+    let exit_code = clean_comments::execute(
+        test_file_path.to_str().unwrap().to_string(),
+        None, // No output directory, would modify in-place if not dry run
+        true, // no_parallel = true
+        true, // no_git = true
+        true, // force = true
+        true  // dry_run = true
+    );
+    
+    // Verify success
+    assert_eq!(exit_code, 0);
+    
+    // Verify the file was NOT modified (since we're in dry-run mode)
+    let content_after_run = fs::read_to_string(&test_file_path).unwrap();
+    assert_eq!(original_content, content_after_run);
+    assert!(content_after_run.contains("// This is a comment"));
+    assert!(content_after_run.contains("// End of line comment"));
 }
 
 fn create_test_files(dir_path: &Path) {

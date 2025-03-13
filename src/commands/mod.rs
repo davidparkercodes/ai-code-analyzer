@@ -101,6 +101,10 @@ pub enum Commands {
         /// Force removing comments without asking for confirmation in non-git directories
         #[arg(long)]
         force: bool,
+        
+        /// Show what would be removed without making changes
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -111,7 +115,7 @@ pub async fn execute(cli: Cli) -> i32 {
         Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
         Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
         Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
-        Commands::CleanComments { path, output, no_parallel, no_git, force } => 
-            clean_comments::execute(path, output, no_parallel, no_git, force),
+        Commands::CleanComments { path, output, no_parallel, no_git, force, dry_run } => 
+            clean_comments::execute(path, output, no_parallel, no_git, force, dry_run),
     }
 }

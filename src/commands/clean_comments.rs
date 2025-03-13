@@ -15,9 +15,10 @@ pub fn execute(
     output_dir: Option<String>, 
     no_parallel: bool,
     no_git: bool,
-    force: bool
+    force: bool,
+    dry_run: bool
 ) -> i32 {
-    match execute_clean_comments_command(path, output_dir, no_parallel, no_git, force) {
+    match execute_clean_comments_command(path, output_dir, no_parallel, no_git, force, dry_run) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -28,35 +29,44 @@ fn execute_clean_comments_command(
     output_dir: Option<String>,
     no_parallel: bool,
     no_git: bool,
-    force: bool
+    force: bool,
+    dry_run: bool
 ) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let path_buf = PathBuf::from(&path);
     
-    // Git repository check
-    let is_git_repo = if !no_git {
-        check_git_repository(&path_buf)?
+    // If dry-run, don't need Git repository check or confirmation
+    if !dry_run {
+        // Git repository check
+        let is_git_repo = if !no_git {
+            check_git_repository(&path_buf)?
+        } else {
+            false
+        };
+        
+        // If not a git repo and not in force mode, ask for confirmation
+        if !is_git_repo && !force && output_dir.is_none() && !confirm_non_git_operation()? {
+            style::print_info("Operation cancelled by user.");
+            return Ok(());
+        }
     } else {
-        false
-    };
-    
-    // If not a git repo and not in force mode, ask for confirmation
-    if !is_git_repo && !force && output_dir.is_none() && !confirm_non_git_operation()? {
-        style::print_info("Operation cancelled by user.");
-        return Ok(());
+        style::print_info("Running in dry-run mode. No files will be modified.");
     }
     
     display_clean_header(&path);
     log_parallel_status(parallel_enabled);
     
     let start_time = Instant::now();
-    let stats = clean_comments(&path, output_dir.as_deref())?;
+    let stats = clean_comments(&path, output_dir.as_deref(), dry_run)?;
     
     display_clean_results(&stats, start_time);
     
     // Handle Git operations if this is a git repository and changes were made
-    if is_git_repo && stats.changed_files > 0 && output_dir.is_none() {
-        handle_git_operations(&path_buf)?;
+    if !dry_run && no_git == false && stats.changed_files > 0 && output_dir.is_none() {
+        let is_git_repo = check_git_repository(&path_buf)?;
+        if is_git_repo {
+            handle_git_operations(&path_buf)?;
+        }
     }
     
     Ok(())
@@ -172,7 +182,7 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
 
 fn display_clean_header(directory_path: &str) {
     style::print_header("Cleaning Double-Slash Comments");
-    style::print_info(&format!("Cleaning Rust files in directory: {}", directory_path));
+    style::print_info(&format!("Analyzing Rust files in directory: {}", directory_path));
 }
 
 struct CleanStats {
@@ -181,7 +191,7 @@ struct CleanStats {
     removed_comments: usize,
 }
 
-fn clean_comments(directory_path: &str, output_dir: Option<&str>) -> AppResult<CleanStats> {
+fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<CleanStats> {
     let path = Path::new(directory_path);
     
     if !path.exists() {
@@ -207,21 +217,25 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>) -> AppResult<C
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
-    // Create output directory if specified
-    let output_base = match output_dir {
-        Some(dir) => {
-            let out_path = Path::new(dir);
-            if !out_path.exists() {
-                fs::create_dir_all(out_path).map_err(|e| {
-                    AppError::FileSystem { 
-                        path: out_path.to_path_buf(), 
-                        message: format!("Failed to create output directory: {}", e) 
-                    }
-                })?;
-            }
-            Some(PathBuf::from(dir))
-        },
-        None => None,
+    // Create output directory if specified and not in dry-run mode
+    let output_base = if !dry_run {
+        match output_dir {
+            Some(dir) => {
+                let out_path = Path::new(dir);
+                if !out_path.exists() {
+                    fs::create_dir_all(out_path).map_err(|e| {
+                        AppError::FileSystem { 
+                            path: out_path.to_path_buf(), 
+                            message: format!("Failed to create output directory: {}", e) 
+                        }
+                    })?;
+                }
+                Some(PathBuf::from(dir))
+            },
+            None => None,
+        }
+    } else {
+        None
     };
     
     // Handle both file and directory paths
@@ -234,25 +248,31 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>) -> AppResult<C
                 let mut comment_count = 0;
                 let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, &mut comment_count);
                 
-                // Only write if comments were found and removed
+                // Only process if comments were found and removed
                 if comment_count > 0 {
                     stats.changed_files += 1;
                     stats.removed_comments += comment_count;
                     
-                    // Determine target path
-                    let file_name = path.file_name().unwrap();
-                    let target_path = match &output_base {
-                        Some(base) => base.join(file_name),
-                        None => path.to_path_buf(),
-                    };
-                    
-                    // Write cleaned content
-                    fs::write(&target_path, cleaned_content).map_err(|e| {
-                        AppError::FileSystem { 
-                            path: target_path.clone(), 
-                            message: format!("Failed to write file: {}", e) 
-                        }
-                    })?;
+                    if dry_run {
+                        // In dry-run mode, display what would be changed
+                        style::print_info(&format!("Would remove {} comments from {}", comment_count, path.display()));
+                        print_comment_preview(&content, &cleaned_content, path.to_str().unwrap_or("file"));
+                    } else {
+                        // Determine target path
+                        let file_name = path.file_name().unwrap();
+                        let target_path = match &output_base {
+                            Some(base) => base.join(file_name),
+                            None => path.to_path_buf(),
+                        };
+                        
+                        // Write cleaned content
+                        fs::write(&target_path, cleaned_content).map_err(|e| {
+                            AppError::FileSystem { 
+                                path: target_path.clone(), 
+                                message: format!("Failed to write file: {}", e) 
+                            }
+                        })?;
+                    }
                 }
             }
         }
@@ -282,35 +302,41 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>) -> AppResult<C
                     stats.changed_files += 1;
                     stats.removed_comments += comment_count;
                     
-                    // Determine where to write the file
-                    let target_path = match &output_base {
-                        Some(base) => {
-                            // Create a relative path from the input directory and append to output directory
-                            let rel_path = file_path.strip_prefix(path).unwrap_or(file_path);
-                            let target = base.join(rel_path);
-                            
-                            // Ensure parent directories exist
-                            if let Some(parent) = target.parent() {
-                                fs::create_dir_all(parent).map_err(|e| {
-                                    AppError::FileSystem { 
-                                        path: parent.to_path_buf(), 
-                                        message: format!("Failed to create directory: {}", e) 
-                                    }
-                                })?;
+                    if dry_run {
+                        // In dry-run mode, display what would be changed
+                        style::print_info(&format!("Would remove {} comments from {}", comment_count, file_path.display()));
+                        print_comment_preview(&content, &cleaned_content, file_path.to_str().unwrap_or("file"));
+                    } else {
+                        // Determine where to write the file
+                        let target_path = match &output_base {
+                            Some(base) => {
+                                // Create a relative path from the input directory and append to output directory
+                                let rel_path = file_path.strip_prefix(path).unwrap_or(file_path);
+                                let target = base.join(rel_path);
+                                
+                                // Ensure parent directories exist
+                                if let Some(parent) = target.parent() {
+                                    fs::create_dir_all(parent).map_err(|e| {
+                                        AppError::FileSystem { 
+                                            path: parent.to_path_buf(), 
+                                            message: format!("Failed to create directory: {}", e) 
+                                        }
+                                    })?;
+                                }
+                                
+                                target
+                            },
+                            None => file_path.to_path_buf(),
+                        };
+                        
+                        // Write the cleaned content
+                        fs::write(&target_path, cleaned_content).map_err(|e| {
+                            AppError::FileSystem { 
+                                path: target_path.clone(), 
+                                message: format!("Failed to write file: {}", e) 
                             }
-                            
-                            target
-                        },
-                        None => file_path.to_path_buf(),
-                    };
-                    
-                    // Write the cleaned content
-                    fs::write(&target_path, cleaned_content).map_err(|e| {
-                        AppError::FileSystem { 
-                            path: target_path.clone(), 
-                            message: format!("Failed to write file: {}", e) 
-                        }
-                    })?;
+                        })?;
+                    }
                 }
             }
         }
@@ -376,4 +402,63 @@ fn display_clean_results(stats: &CleanStats, start_time: Instant) {
     println!("Files changed: {}", stats.changed_files);
     println!("Comments removed: {}", stats.removed_comments);
     style::print_success(&format!("Cleaning completed in {:.2?}", elapsed));
+}
+
+fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
+    // Find the differences between original and cleaned content
+    let original_lines: Vec<&str> = original.lines().collect();
+    let cleaned_lines: Vec<&str> = cleaned.lines().collect();
+    
+    // For each original line, check if it's in the cleaned content
+    // If not, it was likely a comment-only line that was removed
+    // If it's different, it likely had a comment at the end that was removed
+    
+    const MAX_PREVIEW_LINES: usize = 5; // Limit preview to first 5 changes
+    let mut preview_count = 0;
+    
+    println!("\n{}", style::bold(&format!("Preview of changes for {}", file_path)));
+    
+    // Compare up to the smaller of the two line counts
+    let min_lines = std::cmp::min(original_lines.len(), cleaned_lines.len());
+    
+    for i in 0..min_lines {
+        // If lines differ, show the difference
+        if original_lines[i] != cleaned_lines[i] && preview_count < MAX_PREVIEW_LINES {
+            let original_line = original_lines[i];
+            let cleaned_line = cleaned_lines[i];
+            
+            if cleaned_line.trim().is_empty() {
+                // Line was completely removed (was only a comment)
+                println!("- {}", style::dimmed(original_line));
+            } else {
+                // Part of the line was removed (comment at the end)
+                println!("- {}", style::dimmed(original_line));
+                println!("+ {}", style::success(cleaned_line));
+            }
+            
+            preview_count += 1;
+        }
+    }
+    
+    // Check for lines completely removed (original had more lines than cleaned)
+    if original_lines.len() > cleaned_lines.len() {
+        for i in min_lines..original_lines.len() {
+            if preview_count < MAX_PREVIEW_LINES {
+                println!("- {}", style::dimmed(original_lines[i]));
+                preview_count += 1;
+            } else {
+                break;
+            }
+        }
+    }
+    
+    // If there are more changes than the preview limit, show a message
+    let total_changes = original_lines.len() - cleaned_lines.len() + 
+                      (0..min_lines).filter(|&i| original_lines[i] != cleaned_lines[i]).count();
+    
+    if total_changes > MAX_PREVIEW_LINES {
+        println!("... and {} more changes", total_changes - MAX_PREVIEW_LINES);
+    }
+    
+    println!();
 }
