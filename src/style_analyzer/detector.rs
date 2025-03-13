@@ -1,4 +1,4 @@
-use crate::analyzer::file_analyzer::FileAnalyzer;
+// FileAnalyzer import removed as it's not used
 use crate::metrics::language::LanguageDetector;
 use crate::style_analyzer::pattern::{
     BracketStyle, IndentationStyle, NamingConvention, StylePattern, StylePatternCollection, StyleRule,
@@ -14,14 +14,12 @@ use super::report::StyleReport;
 
 pub struct StyleDetector {
     language_detector: LanguageDetector,
-    file_analyzer: FileAnalyzer,
 }
 
 impl StyleDetector {
     pub fn new() -> Self {
         StyleDetector {
             language_detector: LanguageDetector::new(),
-            file_analyzer: FileAnalyzer::new(),
         }
     }
 
@@ -164,7 +162,7 @@ impl StyleDetector {
         }
         
         if total_indent_lines > 0 {
-            let mut style_rule = if tab_count > 0 && space_indent_counts.values().sum::<usize>() > 0 {
+            let style_rule = if tab_count > 0 && space_indent_counts.values().sum::<usize>() > 0 {
                 // Mixed tabs and spaces
                 StyleRule::IndentationStyle(IndentationStyle::Mixed)
             } else if tab_count > 0 {
@@ -278,28 +276,17 @@ impl StyleDetector {
         
         if total_identifiers > 0 {
             // Find dominant naming convention
-            let mut max_count = 0;
-            let mut convention = NamingConvention::Mixed;
-            
-            if camel_count > max_count {
-                max_count = camel_count;
-                convention = NamingConvention::CamelCase;
-            }
-            
-            if pascal_count > max_count {
-                max_count = pascal_count;
-                convention = NamingConvention::PascalCase;
-            }
-            
-            if snake_count > max_count {
-                max_count = snake_count;
-                convention = NamingConvention::SnakeCase;
-            }
-            
-            if screaming_count > max_count {
-                max_count = screaming_count;
-                convention = NamingConvention::ScreamingSnakeCase;
-            }
+            let convention = if camel_count > pascal_count && camel_count > snake_count && camel_count > screaming_count {
+                NamingConvention::CamelCase
+            } else if pascal_count > camel_count && pascal_count > snake_count && pascal_count > screaming_count {
+                NamingConvention::PascalCase
+            } else if snake_count > camel_count && snake_count > pascal_count && snake_count > screaming_count {
+                NamingConvention::SnakeCase
+            } else if screaming_count > camel_count && screaming_count > pascal_count && screaming_count > snake_count {
+                NamingConvention::ScreamingSnakeCase
+            } else {
+                NamingConvention::Mixed
+            };
             
             // If multiple conventions with significant presence, mark as mixed
             let threshold = total_identifiers as f64 * 0.25; // 25% threshold
@@ -367,16 +354,8 @@ impl StyleDetector {
         }
         
         if total_lines > 0 {
-            // Find the most common line length group
-            let mut max_count = 0;
-            let mut most_common_length = 0;
-            
-            for (&length, &count) in &length_counts {
-                if count > max_count {
-                    max_count = count;
-                    most_common_length = length;
-                }
-            }
+            // We don't need to find the most common line length group
+            // as we're using the 95th percentile approach instead
             
             // Find 95th percentile line length
             let mut sorted_lengths: Vec<usize> = Vec::new();
