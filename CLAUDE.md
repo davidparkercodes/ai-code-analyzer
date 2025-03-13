@@ -3,6 +3,38 @@
 ## Project Overview
 CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze codebases. It extracts metrics, detects coding styles, generates AI-ready summaries, maps architecture and dependencies, and more. Built with Rust for memory safety, performance, concurrency, and reliability, it targets developers, AI engineers, DevOps teams, and software architects.
 
+## Codebase Structure
+- **src/main.rs**: Entry point with CLI interface using clap for command parsing
+- **src/lib.rs**: Re-exports public modules for testing and external use
+- **src/analyzer/**: Core analysis functionality
+  - **mod.rs**: Main Analyzer struct that orchestrates code metrics and dependency analysis
+  - **file_analyzer.rs**: Handles individual file analysis
+- **src/metrics/**: Code metrics functionality
+  - **collector.rs**: Collects metrics from codebase
+  - **models.rs**: Data structures for metrics (CodeMetrics, LanguageMetrics)
+  - **reporter.rs**: Formats and displays metrics data
+  - **language.rs**: Language detection and line counting
+- **src/dependency/**: Dependency analysis 
+  - **dependency_analyzer.rs**: Analyzes code dependencies
+  - **dependency_graph.rs**: Graph structure representing dependencies
+  - **dependency_reporter.rs**: Reports and exports dependency data
+- **src/output/**: Output formatting utilities
+  - **style.rs**: Console styling and formatting functions
+- **tests/**: Test cases for all functionality
+
+## Features
+- Code metrics: LOC, blank lines, comment lines
+- Separate metrics for production and test code
+- Language-specific metrics 
+- Dependency analysis with graph visualization
+- Circular dependency detection
+- Export dependency graphs in DOT format
+
+## Command Line Interface
+- `cargo run -- run [path]`: Full analysis (metrics + dependencies)
+- `cargo run -- metrics [path]`: Code metrics only
+- `cargo run -- dependencies [path] [--output file.dot]`: Dependency analysis with optional DOT export
+
 ## Code Quality Standards
 - Follow Clean Code principles:
   - Use meaningful and intention-revealing names

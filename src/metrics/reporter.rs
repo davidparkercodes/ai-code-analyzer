@@ -19,7 +19,7 @@ impl MetricsReporter {
         print_header("Code Metrics Summary:");
         println!(
             "{}",
-            StyledText::new("====================").foreground(Color::Cyan)
+            StyledText::new("====================").foreground(ThemeColors::SEPARATOR)
         );
         
         // Print overall metrics
@@ -30,7 +30,7 @@ impl MetricsReporter {
         print_header("Production Code Metrics:");
         println!(
             "{}",
-            StyledText::new("========================").foreground(Color::Cyan)
+            StyledText::new("========================").foreground(ThemeColors::SEPARATOR)
         );
         self.print_production_metrics(metrics);
         
@@ -39,7 +39,7 @@ impl MetricsReporter {
         print_header("Test Code Metrics:");
         println!(
             "{}",
-            StyledText::new("=================").foreground(Color::Cyan)
+            StyledText::new("=================").foreground(ThemeColors::SEPARATOR)
         );
         self.print_test_metrics(metrics);
     }
@@ -75,7 +75,7 @@ impl MetricsReporter {
                 highlight(label),
                 " ".repeat(max_label_len - label.len()),
                 StyledText::new(&format!("{:>width$}", value, width = max_value_len))
-                    .foreground(Color::Cyan)
+                    .foreground(ThemeColors::NUMBER)
                     .style(Style::Bold)
             );
         }
@@ -110,7 +110,7 @@ impl MetricsReporter {
                 highlight(label),
                 " ".repeat(max_label_len - label.len()),
                 StyledText::new(&format!("{:>width$}", value, width = max_value_len))
-                    .foreground(Color::Green)
+                    .foreground(ThemeColors::NUMBER)
                     .style(Style::Bold)
             );
         }
@@ -145,7 +145,7 @@ impl MetricsReporter {
                 highlight(label),
                 " ".repeat(max_label_len - label.len()),
                 StyledText::new(&format!("{:>width$}", value, width = max_value_len))
-                    .foreground(Color::Yellow)
+                    .foreground(ThemeColors::NUMBER)
                     .style(Style::Bold)
             );
         }
@@ -156,10 +156,10 @@ impl MetricsReporter {
             print_header("Overall Breakdown by Language:");
             println!(
                 "{}",
-                StyledText::new("===========================").foreground(Color::Cyan)
+                StyledText::new("===========================").foreground(ThemeColors::SEPARATOR)
             );
 
-            self.print_language_breakdown(&metrics.by_language, Color::Cyan);
+            self.print_language_breakdown(&metrics.by_language);
         }
         
         // Show production code breakdown by language
@@ -168,10 +168,10 @@ impl MetricsReporter {
             print_header("Production Code by Language:");
             println!(
                 "{}",
-                StyledText::new("===========================").foreground(Color::Green)
+                StyledText::new("===========================").foreground(ThemeColors::SEPARATOR)
             );
 
-            self.print_language_breakdown(&metrics.prod_by_language, Color::Green);
+            self.print_language_breakdown(&metrics.prod_by_language);
         }
         
         // Show test code breakdown by language
@@ -180,14 +180,14 @@ impl MetricsReporter {
             print_header("Test Code by Language:");
             println!(
                 "{}",
-                StyledText::new("=====================").foreground(Color::Yellow)
+                StyledText::new("=====================").foreground(ThemeColors::SEPARATOR)
             );
 
-            self.print_language_breakdown(&metrics.test_by_language, Color::Yellow);
+            self.print_language_breakdown(&metrics.test_by_language);
         }
     }
     
-    fn print_language_breakdown(&self, language_map: &std::collections::HashMap<String, crate::metrics::models::LanguageMetrics>, color: Color) {
+    fn print_language_breakdown(&self, language_map: &std::collections::HashMap<String, crate::metrics::models::LanguageMetrics>) {
         let mut languages: Vec<(&String, &crate::metrics::models::LanguageMetrics)> =
             language_map.iter().collect();
 
@@ -238,7 +238,7 @@ impl MetricsReporter {
             files_width = files_width,
             loc_width = loc_width
         );
-        println!("{}", StyledText::new(&header).foreground(Color::Blue));
+        println!("{}", StyledText::new(&header).foreground(ThemeColors::TABLE_HEADER));
         
         // Print header separator
         let lang_separator = "-".repeat(language_header.len());
@@ -253,13 +253,13 @@ impl MetricsReporter {
             files_width = files_width,
             loc_width = loc_width
         );
-        println!("{}", StyledText::new(&separator).foreground(Color::Blue));
+        println!("{}", StyledText::new(&separator).foreground(ThemeColors::TABLE_HEADER));
 
         // Print language rows
         for (language, lang_metrics) in languages {
             // Use a different approach: print each column separately with correct spacing
             print!("{}", StyledText::new(language)
-                .foreground(color)
+                .foreground(ThemeColors::LANGUAGE)
                 .style(Style::Bold));
             
             // Calculate required padding between columns
@@ -269,12 +269,12 @@ impl MetricsReporter {
             let files_str = lang_metrics.files.to_string();
             let files_padding = files_width - files_str.len();
             print!("{}{}", " ".repeat(files_padding), 
-                StyledText::new(&files_str).foreground(Color::White));
+                StyledText::new(&files_str).foreground(ThemeColors::NUMBER));
             
             let loc_str = lang_metrics.lines_of_code.to_string();
             let loc_padding = loc_width - loc_str.len();
             println!("{}{}", " ".repeat(loc_padding),
-                StyledText::new(&loc_str).foreground(Color::White));
+                StyledText::new(&loc_str).foreground(ThemeColors::NUMBER));
         }
     }
 }

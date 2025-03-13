@@ -21,7 +21,7 @@ impl DependencyReporter {
         print_header("Dependency Analysis:");
         println!(
             "{}",
-            StyledText::new("====================").foreground(Color::Cyan)
+            StyledText::new("====================").foreground(ThemeColors::SEPARATOR)
         );
         
         self.print_summary(graph);
@@ -39,7 +39,7 @@ impl DependencyReporter {
         print_header("Dependency Summary:");
         println!(
             "{}",
-            StyledText::new("====================").foreground(Color::Cyan)
+            StyledText::new("====================").foreground(ThemeColors::SEPARATOR)
         );
         
         let node_count = graph.get_nodes().len();
@@ -95,7 +95,7 @@ impl DependencyReporter {
                 highlight(label),
                 " ".repeat(max_label_len - label.len()),
                 StyledText::new(&value)
-                    .foreground(Color::Cyan)
+                    .foreground(ThemeColors::NUMBER)
                     .style(Style::Bold)
             );
         }
@@ -108,11 +108,11 @@ impl DependencyReporter {
         print_header("Circular Dependencies:");
         println!(
             "{}",
-            StyledText::new("=====================").foreground(Color::Cyan)
+            StyledText::new("=====================").foreground(ThemeColors::SEPARATOR)
         );
         
         if cycles.is_empty() {
-            println!("{}", StyledText::new("No circular dependencies found.").foreground(Color::Green));
+            println!("{}", StyledText::new("No circular dependencies found.").foreground(ThemeColors::LANGUAGE));
         } else {
             println!(
                 "{}",
@@ -133,11 +133,11 @@ impl DependencyReporter {
                 for (j, node) in cycle.iter().enumerate() {
                     if j < cycle.len() - 1 {
                         print!("  ");
-                        print!("{}", StyledText::new(node).foreground(Color::White));
+                        print!("{}", StyledText::new(node).foreground(ThemeColors::LABEL));
                         println!(" → ");
                     } else {
                         print!("  ");
-                        print!("{}", StyledText::new(node).foreground(Color::White));
+                        print!("{}", StyledText::new(node).foreground(ThemeColors::LABEL));
                         println!(" → (back to start)");
                     }
                 }
@@ -151,7 +151,7 @@ impl DependencyReporter {
         print_header("Top Dependencies:");
         println!(
             "{}",
-            StyledText::new("================").foreground(Color::Cyan)
+            StyledText::new("================").foreground(ThemeColors::SEPARATOR)
         );
         
         // Get all nodes with their dependency counts
@@ -177,7 +177,7 @@ impl DependencyReporter {
         
         // Skip if no dependencies
         if top_nodes.is_empty() || (top_nodes[0].1 == 0 && top_nodes[0].2 == 0) {
-            println!("{}", StyledText::new("No significant dependencies found.").foreground(Color::Green));
+            println!("{}", StyledText::new("No significant dependencies found.").foreground(ThemeColors::LANGUAGE));
             return;
         }
         
@@ -229,7 +229,7 @@ impl DependencyReporter {
             deps_width = deps_width,
             dependents_width = dependents_width
         );
-        println!("{}", StyledText::new(&header).foreground(Color::Blue));
+        println!("{}", StyledText::new(&header).foreground(ThemeColors::TABLE_HEADER));
         
         // Print header separator
         let file_separator = "-".repeat(file_header.len());
@@ -244,7 +244,7 @@ impl DependencyReporter {
             deps_width = deps_width,
             dependents_width = dependents_width
         );
-        println!("{}", StyledText::new(&separator).foreground(Color::Blue));
+        println!("{}", StyledText::new(&separator).foreground(ThemeColors::TABLE_HEADER));
         
         // Print node rows
         for (name, deps, dependents) in top_nodes {
@@ -256,7 +256,7 @@ impl DependencyReporter {
             
             // Print filename column
             print!("{}", StyledText::new(display_name)
-                .foreground(Color::Green)
+                .foreground(ThemeColors::LANGUAGE)
                 .style(Style::Bold));
             
             // Calculate required padding between columns
@@ -267,13 +267,13 @@ impl DependencyReporter {
             let deps_str = deps.to_string();
             let deps_padding = deps_width - deps_str.len();
             print!("{}{}", " ".repeat(deps_padding), 
-                StyledText::new(&deps_str).foreground(Color::White));
+                StyledText::new(&deps_str).foreground(ThemeColors::NUMBER));
             
             // Print dependents column
             let dependents_str = dependents.to_string();
             let dependents_padding = dependents_width - dependents_str.len();
             println!("{}{}", " ".repeat(dependents_padding),
-                StyledText::new(&dependents_str).foreground(Color::White));
+                StyledText::new(&dependents_str).foreground(ThemeColors::NUMBER));
         }
     }
     
