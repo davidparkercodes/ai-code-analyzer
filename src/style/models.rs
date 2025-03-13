@@ -43,7 +43,8 @@ pub struct FunctionMetrics {
 
 #[derive(Debug, Clone)]
 pub struct StyleProfile {
-    pub language: String,
+    // File information
+    pub file_type: String, // Renamed from language to more accurate name
     pub indentation: IndentationType,
     pub brace_style: BraceStyle,
     pub line_metrics: LineMetrics,
@@ -57,7 +58,7 @@ pub struct StyleProfile {
 impl Default for StyleProfile {
     fn default() -> Self {
         Self {
-            language: String::new(),
+            file_type: String::new(),
             indentation: IndentationType::Unknown,
             brace_style: BraceStyle::Unknown,
             line_metrics: LineMetrics {
@@ -82,7 +83,7 @@ impl Default for StyleProfile {
 impl StyleProfile {
     pub fn new(language: &str) -> Self {
         Self {
-            language: language.to_string(),
+            file_type: language.to_string(),
             ..Default::default()
         }
     }
