@@ -40,12 +40,16 @@ fn main() {
             }
         },
         Commands::Metrics { path } => {
-            let mut metrics = metrics::CodeMetrics::new();
-            if let Err(e) = metrics.analyze_directory(path) {
-                eprintln!("Error analyzing directory: {}", e);
-                process::exit(1);
+            let collector = metrics::collector::MetricsCollector::new();
+            let reporter = metrics::reporter::MetricsReporter::new();
+            
+            match collector.collect_metrics(path) {
+                Ok(metrics) => reporter.report(&metrics),
+                Err(e) => {
+                    eprintln!("Error analyzing directory: {}", e);
+                    process::exit(1);
+                }
             }
-            metrics.print_summary();
         }
     }
 }
