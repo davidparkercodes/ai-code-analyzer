@@ -1,5 +1,5 @@
 use crate::ai::{
-    AiModelProvider, AiConfig, AiProvider, ModelTier,
+    AiModelProvider, AiConfig, AiProvider, ModelTier, AiError,
     anthropic::AnthropicProvider,
     openai::OpenAiProvider,
     mistral::MistralProvider,
