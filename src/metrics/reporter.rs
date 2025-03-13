@@ -64,53 +64,82 @@ impl MetricsReporter {
 
             languages.sort_by(|a, b| b.1.lines_of_code.cmp(&a.1.lines_of_code));
             
-            // Find the longest language name and maximum values for alignment
-            let max_lang_len = languages.iter().map(|(lang, _)| lang.len()).max().unwrap_or(0);
+            // Constants for table formatting
+            const COL_SPACING: usize = 6; // Spacing between columns
+            let language_header = "Language";
+            let files_header = "Files";
+            let loc_header = "Lines of Code";
+            
+            // Calculate column widths
+            let max_lang_len = languages.iter()
+                .map(|(lang, _)| lang.len())
+                .max()
+                .unwrap_or(0)
+                .max(language_header.len());
+                
             let max_files = languages.iter()
                 .map(|(_, metrics)| metrics.files.to_string().len())
-                .max().unwrap_or(0);
+                .max()
+                .unwrap_or(0)
+                .max(files_header.len());
+                
             let max_loc = languages.iter()
                 .map(|(_, metrics)| metrics.lines_of_code.to_string().len())
-                .max().unwrap_or(0);
+                .max()
+                .unwrap_or(0)
+                .max(loc_header.len());
+            
+            // Calculate column widths
+            let lang_width = max_lang_len + COL_SPACING;
+            let files_width = max_files + COL_SPACING;
+            let loc_width = max_loc + COL_SPACING;
             
             // Print header
-            println!("{}", 
-                StyledText::new(&format!(
-                    "{:<width_lang$}    {:>width_files$}    {:>width_loc$}",
-                    "Language",
-                    "Files",
-                    "Lines of Code",
-                    width_lang = max_lang_len,
-                    width_files = max_files.max(5), // min width of 5 for "Files"
-                    width_loc = max_loc.max(13),    // min width of 13 for "Lines of Code"
-                )).foreground(Color::Blue)
+            let header = format!("{:<lang_width$}{:>files_width$}{:>loc_width$}",
+                language_header,
+                files_header,
+                loc_header,
+                lang_width = lang_width,
+                files_width = files_width,
+                loc_width = loc_width
             );
+            println!("{}", StyledText::new(&header).foreground(Color::Blue));
             
-            println!("{}", 
-                StyledText::new(&format!(
-                    "{:<width_lang$}    {:>width_files$}    {:>width_loc$}",
-                    "--------",
-                    "-----",
-                    "-------------",
-                    width_lang = max_lang_len,
-                    width_files = max_files.max(5),
-                    width_loc = max_loc.max(13),
-                )).foreground(Color::Blue)
+            // Print header separator
+            let lang_separator = "-".repeat(language_header.len());
+            let files_separator = "-".repeat(files_header.len());
+            let loc_separator = "-".repeat(loc_header.len());
+            
+            let separator = format!("{:<lang_width$}{:>files_width$}{:>loc_width$}",
+                lang_separator,
+                files_separator,
+                loc_separator,
+                lang_width = lang_width,
+                files_width = files_width,
+                loc_width = loc_width
             );
+            println!("{}", StyledText::new(&separator).foreground(Color::Blue));
 
             // Print language rows
             for (language, lang_metrics) in languages {
-                println!(
-                    "{:<width$}    {:>width_files$}    {:>width_loc$}",
-                    StyledText::new(language)
-                        .foreground(Color::Green)
-                        .style(Style::Bold),
-                    StyledText::new(&lang_metrics.files.to_string()).foreground(Color::White),
-                    StyledText::new(&lang_metrics.lines_of_code.to_string()).foreground(Color::White),
-                    width = max_lang_len,
-                    width_files = max_files.max(5),
-                    width_loc = max_loc.max(13),
-                );
+                // Use a different approach: print each column separately with correct spacing
+                print!("{}", StyledText::new(language)
+                    .foreground(Color::Green)
+                    .style(Style::Bold));
+                
+                // Calculate required padding between columns
+                let lang_padding = lang_width - language.len();
+                print!("{}", " ".repeat(lang_padding));
+                
+                let files_str = lang_metrics.files.to_string();
+                let files_padding = files_width - files_str.len();
+                print!("{}{}", " ".repeat(files_padding), 
+                    StyledText::new(&files_str).foreground(Color::White));
+                
+                let loc_str = lang_metrics.lines_of_code.to_string();
+                let loc_padding = loc_width - loc_str.len();
+                println!("{}{}", " ".repeat(loc_padding),
+                    StyledText::new(&loc_str).foreground(Color::White));
             }
         }
     }

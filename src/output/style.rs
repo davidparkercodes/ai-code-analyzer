@@ -62,6 +62,11 @@ impl StyledText {
         self.style = Some(style);
         self
     }
+    
+    #[allow(dead_code)]
+    pub fn to_string(&self) -> String {
+        format!("{}", self)
+    }
 }
 
 impl fmt::Display for StyledText {
