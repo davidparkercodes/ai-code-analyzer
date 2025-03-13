@@ -398,12 +398,32 @@ impl StyleReporter {
     }
     
     fn format_file_path(&self, path: &str) -> String {
-        // Simplify path for display
+        // Get the relative path from the current directory
+        // Start by splitting the path
         let parts: Vec<&str> = path.split('/').collect();
+        
+        // If we have a very short path, just return it
         if parts.len() <= 2 {
-            path.to_string()
+            return path.to_string();
+        }
+        
+        // Find the src/, tests/, or similar directory to use as a root
+        let mut start_index = 0;
+        for (i, part) in parts.iter().enumerate() {
+            if *part == "src" || *part == "tests" || *part == "lib" || *part == "examples" {
+                start_index = i;
+                break;
+            }
+        }
+        
+        // Build a useful relative path
+        if start_index > 0 {
+            // Include the "src/" or "tests/" prefix
+            parts[start_index..].join("/")
         } else {
-            format!(".../{}", parts.last().unwrap_or(&path))
+            // If we can't find a good starting point, use the last 3 parts
+            let start = if parts.len() > 3 { parts.len() - 3 } else { 0 };
+            parts[start..].join("/")
         }
     }
 }
