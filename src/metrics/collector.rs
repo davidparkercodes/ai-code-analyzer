@@ -68,7 +68,7 @@ impl MetricsCollector {
             metrics.total_files += 1;
 
             if let Some(file_metrics) = self.file_analyzer.analyze_file(path) {
-                metrics.add_language_metrics(file_metrics);
+                metrics.add_language_metrics(file_metrics, &path.to_string_lossy());
             }
         }
 

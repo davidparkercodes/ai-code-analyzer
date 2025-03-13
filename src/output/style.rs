@@ -8,6 +8,7 @@ pub struct StyledText {
 }
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum Color {
     Black,
     Red,
@@ -28,6 +29,7 @@ pub enum Color {
 }
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum Style {
     Bold,
     Dim,
@@ -63,10 +65,7 @@ impl StyledText {
         self
     }
     
-    #[allow(dead_code)]
-    pub fn to_string(&self) -> String {
-        format!("{}", self)
-    }
+    // Remove to_string method as it shadows Display implementation
 }
 
 impl fmt::Display for StyledText {
@@ -160,12 +159,10 @@ pub fn header(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
-#[allow(dead_code)]
 pub fn success(text: &str) -> StyledText {
     StyledText::new(text).foreground(Color::Green)
 }
 
-#[allow(dead_code)]
 pub fn warning(text: &str) -> StyledText {
     StyledText::new(text).foreground(Color::Yellow)
 }
@@ -189,12 +186,10 @@ pub fn print_header(text: &str) {
     println!("{}", header(text));
 }
 
-#[allow(dead_code)]
 pub fn print_success(text: &str) {
     println!("{}", success(text));
 }
 
-#[allow(dead_code)]
 pub fn print_warning(text: &str) {
     println!("{}", warning(text));
 }
