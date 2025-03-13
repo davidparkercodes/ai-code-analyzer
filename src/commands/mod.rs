@@ -3,6 +3,7 @@ mod metrics;
 mod dependencies;
 mod style;
 mod describe;
+pub mod clean_comments;
 
 use clap::{Parser, Subcommand};
 
@@ -78,6 +79,21 @@ pub enum Commands {
         #[arg(long)]
         no_parallel: bool,
     },
+    /// Clean double-slash comments from Rust files
+    #[command(name = "clean-comments")]
+    CleanComments {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Output directory for cleaned files (optional, modifies files in-place if not provided)
+        #[arg(short, long)]
+        output: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+    },
 }
 
 pub async fn execute(cli: Cli) -> i32 {
@@ -87,5 +103,6 @@ pub async fn execute(cli: Cli) -> i32 {
         Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
         Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
         Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
+        Commands::CleanComments { path, output, no_parallel } => clean_comments::execute(path, output, no_parallel),
     }
 }

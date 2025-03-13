@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod analyzer;
 pub mod cache;
+pub mod commands;
 pub mod dependency;
 pub mod description;
 pub mod metrics;
@@ -12,6 +13,7 @@ pub mod util;
 pub use crate::ai::*;
 pub use crate::analyzer::*;
 pub use crate::cache::*;
+pub use crate::commands::*;
 pub use crate::dependency::*;
 pub use crate::description::*;
 pub use crate::metrics::*;
