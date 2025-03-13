@@ -41,14 +41,26 @@ impl StyleReport {
         // Add language statistics
         guide.push_str("## Codebase Statistics\n\n");
         if !self.language_stats.is_empty() {
-            guide.push_str("| Language | Number of Files |\n");
-            guide.push_str("|----------|----------------|\n");
+            // First pass to determine column widths
+            let mut lang_width = "Language".len();
+            let mut count_width = "Number of Files".len();
             
             let mut languages: Vec<_> = self.language_stats.iter().collect();
             languages.sort_by(|a, b| b.1.cmp(a.1));
             
+            // Calculate required column widths
+            for (language, count) in &languages {
+                lang_width = std::cmp::max(lang_width, language.len());
+                count_width = std::cmp::max(count_width, count.to_string().len());
+            }
+            
+            // Create properly padded table headers
+            guide.push_str(&format!("| {:<lang_width$} | {:<count_width$} |\n", "Language", "Number of Files"));
+            guide.push_str(&format!("| {:-<lang_width$} | {:-<count_width$} |\n", "", ""));
+            
+            // Add rows with proper padding
             for (language, count) in languages {
-                guide.push_str(&format!("| {} | {} |\n", language, count));
+                guide.push_str(&format!("| {:<lang_width$} | {:<count_width$} |\n", language, count));
             }
             guide.push_str("\n");
         }
