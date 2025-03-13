@@ -1,5 +1,6 @@
 use code_analyzer::description::CodeDescriptor;
 use code_analyzer::ai::AiConfig;
+use code_analyzer::util::parallel::ParallelProcessing;
 use tempfile::TempDir;
 use std::fs;
 use tokio;

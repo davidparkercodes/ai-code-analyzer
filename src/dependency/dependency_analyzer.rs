@@ -1,6 +1,9 @@
 use crate::cache::AnalysisCache;
 use crate::dependency::dependency_graph::DependencyGraph;
 use crate::metrics::language::LanguageDetector;
+use crate::util::error::{AppError, AppResult};
+use crate::util::file_filter::FileFilter;
+use crate::util::parallel::ParallelProcessing;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -18,6 +21,21 @@ pub struct DependencyAnalyzer {
 impl Default for DependencyAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ParallelProcessing for DependencyAnalyzer {
+    fn enable_parallel_processing(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
+    }
+    
+    fn with_parallel(self, parallel: bool) -> Self {
+        self.enable_parallel_processing(parallel)
+    }
+    
+    fn is_parallel(&self) -> bool {
+        self.parallel
     }
 }
 
@@ -59,20 +77,15 @@ impl DependencyAnalyzer {
         analyzer
     }
     
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
-        self
-    }
-    
-    pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> Result<DependencyGraph, String> {
+    pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<DependencyGraph> {
         let path = dir_path.as_ref();
         
         if !path.exists() {
-            return Err(format!("Path '{}' does not exist", path.display()));
+            return Err(AppError::Analysis(format!("Path '{}' does not exist", path.display())));
         }
         
         if !path.is_dir() {
-            return Err(format!("Path '{}' is not a directory", path.display()));
+            return Err(AppError::Analysis(format!("Path '{}' is not a directory", path.display())));
         }
         
         let graph = Arc::new(Mutex::new(DependencyGraph::new()));
@@ -83,31 +96,7 @@ impl DependencyAnalyzer {
             .git_global(true)
             .git_exclude(true)
             .filter_entry(|e| {
-                let path_str = e.path().to_string_lossy();
-                let file_name = e.path().file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-                // Exclude git files, lock files, config files, and system files
-                let is_excluded_system_file = path_str.contains("/.git/") || 
-                    path_str.ends_with(".lock") || 
-                    path_str.ends_with(".gitignore") ||
-                    file_name == ".DS_Store";
-                
-                // Exclude test files and directories
-                let is_test_file = path_str.contains("/test") || 
-                    path_str.contains("/tests/") || 
-                    path_str.contains("_test.") || 
-                    path_str.ends_with("_test.rs") ||
-                    path_str.ends_with("_tests.rs") ||
-                    path_str.ends_with("Test.java") ||
-                    path_str.ends_with(".test.js") ||
-                    path_str.ends_with(".test.ts") ||
-                    path_str.ends_with("_spec.js") ||
-                    path_str.ends_with("_spec.ts") ||
-                    path_str.ends_with("_test.py") ||
-                    path_str.ends_with("test_") ||
-                    file_name == "test";
-                
-                // Include only if not excluded
-                !is_excluded_system_file && !is_test_file
+                !FileFilter::should_exclude(e.path()) && !FileFilter::is_test_file(e.path())
             })
             .build();
             
@@ -196,7 +185,11 @@ impl DependencyAnalyzer {
         // Purge any stale entries from the cache periodically
         self.cache.purge_stale_entries();
         
-        let final_graph = graph.lock().unwrap().clone();
+        let final_graph = match graph.lock() {
+            Ok(guard) => guard.clone(),
+            Err(e) => return Err(AppError::Analysis(format!("Error accessing dependency graph: {}", e)))
+        };
+        
         Ok(final_graph)
     }
     
@@ -216,81 +209,132 @@ impl DependencyAnalyzer {
         
         let import_patterns = self.supported_languages.get(language)?;
         
+        match language {
+            "Rust" => self.extract_rust_dependencies(&content, import_patterns),
+            "JavaScript" | "TypeScript" => self.extract_js_dependencies(&content, import_patterns),
+            "Python" => self.extract_python_dependencies(&content, import_patterns),
+            _ => Some(Vec::new())
+        }
+    }
+    
+    fn extract_rust_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
         let mut dependencies = Vec::new();
         
         for line in content.lines() {
             let trimmed = line.trim();
             
             for pattern in import_patterns {
-                match language {
-                    "Rust" => {
-                        if pattern == "use" && trimmed.starts_with("use ") {
-                            let parts: Vec<&str> = trimmed.split(&[';', ' ', '{', '}', ':'][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() && !module.starts_with("crate::") && !module.starts_with("self::") && !module.starts_with("std::") {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        } else if pattern == "mod" && trimmed.starts_with("mod ") && !trimmed.contains('{') {
-                            let parts: Vec<&str> = trimmed.split(&[';', ' '][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        }
-                    },
-                    "JavaScript" | "TypeScript" => {
-                        if pattern == "import" && trimmed.starts_with("import ") {
-                            if let Some(from_index) = trimmed.find(" from ") {
-                                if let Some(quote_start) = trimmed[from_index + 6..].find(&['\"', '\''][..]) {
-                                    if let Some(quote_end) = trimmed[(from_index + 6 + quote_start + 1)..].find(&['\"', '\''][..]) {
-                                        let module = &trimmed[(from_index + 6 + quote_start + 1)..(from_index + 6 + quote_start + 1 + quote_end)];
-                                        if !module.is_empty() && !module.starts_with('@') {
-                                            dependencies.push(module.to_string());
-                                        }
-                                    }
-                                }
-                            }
-                        } else if pattern == "require" && trimmed.contains("require(") {
-                            let parts: Vec<&str> = trimmed.split("require(").collect();
-                            if parts.len() > 1 {
-                                let quote_parts: Vec<&str> = parts[1].split(&['\"', '\''][..]).collect();
-                                if quote_parts.len() > 1 {
-                                    let module = quote_parts[1].trim();
-                                    if !module.is_empty() && !module.starts_with('@') {
-                                        dependencies.push(module.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "Python" => {
-                        if pattern == "import" && trimmed.starts_with("import ") {
-                            let parts: Vec<&str> = trimmed.split(&[' ', ','][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() && module != "as" {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        } else if pattern == "from" && trimmed.starts_with("from ") {
-                            if let Some(import_index) = trimmed.find(" import ") {
-                                let module = trimmed[5..import_index].trim();
-                                if !module.is_empty() && module != "." && module != ".." {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        }
-                    },
-                    _ => {}
+                if pattern == "use" && trimmed.starts_with("use ") {
+                    self.extract_rust_use_dependency(trimmed, &mut dependencies);
+                } else if pattern == "mod" && trimmed.starts_with("mod ") && !trimmed.contains('{') {
+                    self.extract_rust_mod_dependency(trimmed, &mut dependencies);
                 }
             }
         }
         
         Some(dependencies)
+    }
+    
+    fn extract_rust_use_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[';', ' ', '{', '}', ':'][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() && !module.starts_with("crate::") && 
+               !module.starts_with("self::") && !module.starts_with("std::") {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_rust_mod_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[';', ' '][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_js_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
+        let mut dependencies = Vec::new();
+        
+        for line in content.lines() {
+            let trimmed = line.trim();
+            
+            for pattern in import_patterns {
+                if pattern == "import" && trimmed.starts_with("import ") {
+                    self.extract_js_import_dependency(trimmed, &mut dependencies);
+                } else if pattern == "require" && trimmed.contains("require(") {
+                    self.extract_js_require_dependency(trimmed, &mut dependencies);
+                }
+            }
+        }
+        
+        Some(dependencies)
+    }
+    
+    fn extract_js_import_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        if let Some(from_index) = line.find(" from ") {
+            if let Some(quote_start) = line[from_index + 6..].find(&['\"', '\''][..]) {
+                if let Some(quote_end) = line[(from_index + 6 + quote_start + 1)..].find(&['\"', '\''][..]) {
+                    let module = &line[(from_index + 6 + quote_start + 1)..(from_index + 6 + quote_start + 1 + quote_end)];
+                    if !module.is_empty() && !module.starts_with('@') {
+                        dependencies.push(module.to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    fn extract_js_require_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split("require(").collect();
+        if parts.len() > 1 {
+            let quote_parts: Vec<&str> = parts[1].split(&['\"', '\''][..]).collect();
+            if quote_parts.len() > 1 {
+                let module = quote_parts[1].trim();
+                if !module.is_empty() && !module.starts_with('@') {
+                    dependencies.push(module.to_string());
+                }
+            }
+        }
+    }
+    
+    fn extract_python_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
+        let mut dependencies = Vec::new();
+        
+        for line in content.lines() {
+            let trimmed = line.trim();
+            
+            for pattern in import_patterns {
+                if pattern == "import" && trimmed.starts_with("import ") {
+                    self.extract_python_import_dependency(trimmed, &mut dependencies);
+                } else if pattern == "from" && trimmed.starts_with("from ") {
+                    self.extract_python_from_dependency(trimmed, &mut dependencies);
+                }
+            }
+        }
+        
+        Some(dependencies)
+    }
+    
+    fn extract_python_import_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[' ', ','][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() && module != "as" {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_python_from_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        if let Some(import_index) = line.find(" import ") {
+            let module = line[5..import_index].trim();
+            if !module.is_empty() && module != "." && module != ".." {
+                dependencies.push(module.to_string());
+            }
+        }
     }
     
     fn normalize_path(&self, path: &Path) -> String {

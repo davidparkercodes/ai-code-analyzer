@@ -6,6 +6,7 @@ pub mod description;
 pub mod metrics;
 pub mod output;
 pub mod style_analyzer;
+pub mod util;
 
 // Re-export the modules for testing
 pub use crate::ai::*;
@@ -16,3 +17,4 @@ pub use crate::description::*;
 pub use crate::metrics::*;
 pub use crate::output::*;
 pub use crate::style_analyzer::*;
+pub use crate::util::*;
