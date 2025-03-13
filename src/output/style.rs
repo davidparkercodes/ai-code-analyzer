@@ -160,18 +160,6 @@ pub fn header(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
-pub fn heading(text: &str) -> StyledText {
-    StyledText::new(text)
-        .foreground(Color::BrightBlue)
-        .style(Style::Bold)
-}
-
-pub fn subheading(text: &str) -> StyledText {
-    StyledText::new(text)
-        .foreground(Color::Cyan)
-        .style(Style::Bold)
-}
-
 pub fn success(text: &str) -> StyledText {
     StyledText::new(text).foreground(Color::Green)
 }
@@ -194,29 +182,9 @@ pub fn highlight(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
-pub fn format_key_value(key: &str, value: &str) -> String {
-    format!("{}  {}", highlight(key), value)
-}
-
-pub fn format_info(text: &str) -> String {
-    format!("{}", info(text))
-}
-
-pub fn format_warning(text: &str) -> String {
-    format!("{}", warning(text))
-}
-
 // Print helpers
 pub fn print_header(text: &str) {
     println!("{}", header(text));
-}
-
-pub fn print_heading(text: &str) {
-    println!("{}", heading(text));
-}
-
-pub fn print_subheading(text: &str) {
-    println!("{}", subheading(text));
 }
 
 pub fn print_success(text: &str) {
