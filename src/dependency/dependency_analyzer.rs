@@ -147,7 +147,7 @@ impl DependencyAnalyzer {
                             let parts: Vec<&str> = trimmed.split(&[';', ' ', '{', '}', ':'][..]).collect();
                             if parts.len() > 1 {
                                 let module = parts[1].trim();
-                                if !module.is_empty() && !module.starts_with("crate::") && !module.starts_with("self::") {
+                                if !module.is_empty() && !module.starts_with("crate::") && !module.starts_with("self::") && !module.starts_with("std::") {
                                     dependencies.push(module.to_string());
                                 }
                             }
@@ -217,6 +217,12 @@ impl DependencyAnalyzer {
     }
     
     fn resolve_dependency(&self, source_path: &str, dependency: &str) -> String {
+        // Filter out std, crate and other special module references
+        if dependency.starts_with("std") || dependency.contains("std::") || 
+           dependency.starts_with("crate") || dependency.contains("crate::") {
+            return dependency.to_string();
+        }
+        
         let source_dir = Path::new(source_path).parent().unwrap_or(Path::new(""));
         let dependency_path = source_dir.join(dependency);
         

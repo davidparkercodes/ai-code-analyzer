@@ -65,10 +65,7 @@ impl StyledText {
         self
     }
     
-    #[allow(dead_code)]
-    pub fn to_string(&self) -> String {
-        format!("{}", self)
-    }
+    // Remove to_string method as it shadows Display implementation
 }
 
 impl fmt::Display for StyledText {
