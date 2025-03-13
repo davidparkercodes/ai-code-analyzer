@@ -5,9 +5,11 @@ use std::path::Path;
 use tempfile::tempdir;
 
 fn setup_test_directory(dir: &Path) {
+    // Create subdirectories
     fs::create_dir_all(dir.join("src/utils")).expect("Failed to create subdirectory");
     fs::create_dir_all(dir.join("tests")).expect("Failed to create subdirectory");
 
+    // Create Rust file
     let rust_content = r#"
 // main.rs
 fn main() {
@@ -20,6 +22,7 @@ fn main() {
     file.write_all(rust_content.as_bytes())
         .expect("Failed to write to file");
 
+    // Create Python file
     let py_content = r#"
 # script.py
 def main():
@@ -31,6 +34,7 @@ def main():
     file.write_all(py_content.as_bytes())
         .expect("Failed to write to file");
 
+    // Create JavaScript file
     let js_content = r#"
 // app.js
 function main() {
@@ -56,10 +60,12 @@ fn test_collect_metrics() {
 
     let metrics = result.unwrap();
 
+    // We should have 3 files and 4 directories (root, src, src/utils, tests)
     assert_eq!(metrics.total_files, 3);
     assert_eq!(metrics.total_directories, 4);
 
-    assert_eq!(metrics.by_language.len(), 3);
+    // Check language breakdown
+    assert_eq!(metrics.by_language.len(), 3); // Rust, Python, JavaScript
     let rust_metrics = metrics
         .by_language
         .get("Rust")
