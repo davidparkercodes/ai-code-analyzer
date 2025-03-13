@@ -1,5 +1,6 @@
 mod analyzer;
 mod metrics;
+mod output;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -35,7 +36,7 @@ fn main() {
         Commands::Run { path } => {
             let mut analyzer = analyzer::Analyzer::new();
             if let Err(e) = analyzer.analyze(path) {
-                eprintln!("Error analyzing directory: {}", e);
+                output::style::print_error(&format!("Error analyzing directory: {}", e));
                 process::exit(1);
             }
         }
@@ -46,7 +47,7 @@ fn main() {
             match collector.collect_metrics(path) {
                 Ok(metrics) => reporter.report(&metrics),
                 Err(e) => {
-                    eprintln!("Error analyzing directory: {}", e);
+                    output::style::print_error(&format!("Error analyzing directory: {}", e));
                     process::exit(1);
                 }
             }
