@@ -54,24 +54,6 @@ enum Commands {
         #[arg(long)]
         no_parallel: bool,
     },
-    /// Analyze code with AI
-    Analyze {
-        /// Path to analyze (defaults to current directory)
-        #[arg(default_value = ".")]
-        path: String,
-        
-        /// Specific file to analyze
-        #[arg(short, long)]
-        file: Option<String>,
-        
-        /// Analysis prompt or question
-        #[arg(short, long)]
-        prompt: Option<String>,
-        
-        /// AI model tier to use (low, medium, high)
-        #[arg(short, long)]
-        tier: Option<String>,
-    },
 }
 
 #[tokio::main]
@@ -148,70 +130,6 @@ async fn main() {
                 Err(e) => {
                     output::style::print_error(&format!("Error analyzing dependencies: {}", e));
                     process::exit(1);
-                }
-            }
-        }
-        Commands::Analyze { path, file, prompt, tier } => {
-            // Parse tier if provided
-            let model_tier = if let Some(tier_str) = tier {
-                match tier_str.parse() {
-                    Ok(t) => Some(t),
-                    Err(e) => {
-                        output::style::print_error(&format!("Invalid tier: {}. Using default tier.", e));
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-            
-            // Create AI provider
-            let ai_provider = ai::factory::create_ai_provider(ai_config.clone(), model_tier);
-            
-            output::style::print_info(&format!("Using AI provider: {} ({})", 
-                ai_provider.provider_name(), ai_provider.model_name()));
-            
-            // Handle file-specific or directory analysis
-            if let Some(file_path) = file {
-                // Read the file
-                match std::fs::read_to_string(&file_path) {
-                    Ok(content) => {
-                        // Analyze the file
-                        let analysis_prompt = prompt.as_deref().unwrap_or("Analyze this code and provide insights.");
-                        output::style::print_info(&format!("Analyzing file: {}", file_path));
-                        
-                        match ai_provider.analyze_code(&content, Some(analysis_prompt)).await {
-                            Ok(analysis) => {
-                                println!("\n{}", analysis);
-                            }
-                            Err(e) => {
-                                output::style::print_error(&format!("AI analysis error: {}", e));
-                                process::exit(1);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        output::style::print_error(&format!("Error reading file: {}", e));
-                        process::exit(1);
-                    }
-                }
-            } else {
-                // Handle directory-level analysis
-                let query = prompt.as_deref().unwrap_or("What can you tell me about this codebase?");
-                
-                output::style::print_info(&format!("Analyzing directory: {}", path));
-                output::style::print_info("This may take some time for large codebases...");
-                
-                // For directory analysis, we would need a more complex implementation
-                // Here we just pass a prompt to the AI
-                match ai_provider.generate_response(query).await {
-                    Ok(response) => {
-                        println!("\n{}", response);
-                    }
-                    Err(e) => {
-                        output::style::print_error(&format!("AI analysis error: {}", e));
-                        process::exit(1);
-                    }
                 }
             }
         }

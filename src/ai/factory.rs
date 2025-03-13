@@ -9,21 +9,21 @@ use std::sync::Arc;
 /// Create an AI provider based on the configuration
 pub fn create_ai_provider(
     config: AiConfig, 
-    tier: Option<ModelTier>
-) -> Arc<dyn AiModelProvider> {
-    // Use the provided tier or fall back to the default from config
-    let model_tier = tier.unwrap_or(config.default_tier);
-    
+    tier: ModelTier
+) -> Result<Arc<dyn AiModelProvider>, AiError> {
     // Create the appropriate provider based on the configuration
     match config.provider {
         AiProvider::Anthropic => {
-            Arc::new(AnthropicProvider::new(config, model_tier))
+            let provider = AnthropicProvider::new(config, tier)?;
+            Ok(Arc::new(provider))
         },
         AiProvider::OpenAi => {
-            Arc::new(OpenAiProvider::new(config, model_tier))
+            let provider = OpenAiProvider::new(config, tier)?;
+            Ok(Arc::new(provider))
         },
         AiProvider::Mistral => {
-            Arc::new(MistralProvider::new(config, model_tier))
+            let provider = MistralProvider::new(config, tier)?;
+            Ok(Arc::new(provider))
         },
     }
 }

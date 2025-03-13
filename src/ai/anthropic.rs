@@ -42,17 +42,20 @@ struct AnthropicResponseContent {
 
 impl AnthropicProvider {
     /// Create a new Anthropic provider with the given configuration and model tier
-    pub fn new(config: AiConfig, model_tier: ModelTier) -> Self {
+    pub fn new(config: AiConfig, model_tier: ModelTier) -> Result<Self, AiError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
             .unwrap_or_default();
             
-        Self {
+        // Validate that we have an API key
+        let _api_key = config.get_api_key(AiProvider::Anthropic)?;
+            
+        Ok(Self {
             config,
             client,
             model_tier,
-        }
+        })
     }
     
     /// Get the API endpoint for Anthropic models
@@ -63,6 +66,11 @@ impl AnthropicProvider {
     /// Get the model name to use for the current tier
     fn get_model_name(&self) -> String {
         self.config.get_model_name(crate::ai::AiProvider::Anthropic, self.model_tier)
+    }
+    
+    /// Get the API key
+    fn get_api_key(&self) -> Result<String, AiError> {
+        self.config.get_api_key(AiProvider::Anthropic)
     }
 }
 
@@ -90,9 +98,11 @@ impl AiModelProvider for AnthropicProvider {
             ],
         };
         
+        let api_key = self.get_api_key()?;
+        
         let response = self.client
             .post(self.api_endpoint())
-            .header("x-api-key", &self.config.api_key)
+            .header("x-api-key", &api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&request)

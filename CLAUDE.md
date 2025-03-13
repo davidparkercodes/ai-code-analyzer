@@ -49,8 +49,9 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
 
 ### AI Environment Variables
 - `AI_PROVIDER`: Selected provider (anthropic, openai, mistral)
-- `AI_TIER`: Default model tier (low, medium, high)
-- `AI_API_KEY`: API key for the selected provider
+- `ANTHROPIC_API_KEY`: API key for Anthropic
+- `OPENAI_API_KEY`: API key for OpenAI
+- `MISTRAL_API_KEY`: API key for Mistral
 - `ANTHROPIC_LOW_MODEL`: Model name for Anthropic low tier
 - `ANTHROPIC_MEDIUM_MODEL`: Model name for Anthropic medium tier
 - `ANTHROPIC_HIGH_MODEL`: Model name for Anthropic high tier

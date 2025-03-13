@@ -42,17 +42,20 @@ struct MistralResponseMessage {
 
 impl MistralProvider {
     /// Create a new Mistral provider with the given configuration and model tier
-    pub fn new(config: AiConfig, model_tier: ModelTier) -> Self {
+    pub fn new(config: AiConfig, model_tier: ModelTier) -> Result<Self, AiError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
             .unwrap_or_default();
             
-        Self {
+        // Validate that we have an API key
+        let _api_key = config.get_api_key(AiProvider::Mistral)?;
+            
+        Ok(Self {
             config,
             client,
             model_tier,
-        }
+        })
     }
     
     /// Get the API endpoint for Mistral models
@@ -63,6 +66,11 @@ impl MistralProvider {
     /// Get the model name to use for the current tier
     fn get_model_name(&self) -> String {
         self.config.get_model_name(crate::ai::AiProvider::Mistral, self.model_tier)
+    }
+    
+    /// Get the API key
+    fn get_api_key(&self) -> Result<String, AiError> {
+        self.config.get_api_key(AiProvider::Mistral)
     }
 }
 
@@ -89,9 +97,11 @@ impl AiModelProvider for MistralProvider {
             temperature: Some(0.7),
         };
         
+        let api_key = self.get_api_key()?;
+        
         let response = self.client
             .post(self.api_endpoint())
-            .header("Authorization", format!("Bearer {}", &self.config.api_key))
+            .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()

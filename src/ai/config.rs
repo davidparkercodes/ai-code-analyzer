@@ -8,11 +8,10 @@ pub struct AiConfig {
     /// The AI provider to use (Anthropic, OpenAI, Mistral)
     pub provider: AiProvider,
     
-    /// The default model tier to use (Low, Medium, High)
-    pub default_tier: ModelTier,
-    
-    /// API key for the selected provider
-    pub api_key: String,
+    /// API keys for each provider
+    pub anthropic_api_key: Option<String>,
+    pub openai_api_key: Option<String>,
+    pub mistral_api_key: Option<String>,
     
     // Model names for each provider and tier
     // Anthropic
@@ -35,8 +34,11 @@ impl Default for AiConfig {
     fn default() -> Self {
         Self {
             provider: AiProvider::default(),
-            default_tier: ModelTier::default(),
-            api_key: String::new(),
+            
+            // API keys
+            anthropic_api_key: None,
+            openai_api_key: None,
+            mistral_api_key: None,
             
             // Default model names
             anthropic_low_model: "claude-3-haiku-20240307".to_string(),
@@ -68,14 +70,18 @@ impl AiConfig {
             config.provider = provider_str.parse().map_err(|e| AiError::Config(e))?;
         }
         
-        // Set default tier
-        if let Ok(tier_str) = env::var("AI_TIER") {
-            config.default_tier = tier_str.parse().map_err(|e| AiError::Config(e))?;
+        // Set API keys for each provider
+        if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
+            config.anthropic_api_key = Some(key);
         }
         
-        // Set API key
-        config.api_key = env::var("AI_API_KEY")
-            .map_err(|_| AiError::Config("Missing AI_API_KEY environment variable".to_string()))?;
+        if let Ok(key) = env::var("OPENAI_API_KEY") {
+            config.openai_api_key = Some(key);
+        }
+        
+        if let Ok(key) = env::var("MISTRAL_API_KEY") {
+            config.mistral_api_key = Some(key);
+        }
         
         // Set model names (if provided)
         Self::set_model_if_exists(&mut config.anthropic_low_model, "ANTHROPIC_LOW_MODEL");
@@ -89,6 +95,20 @@ impl AiConfig {
         Self::set_model_if_exists(&mut config.mistral_low_model, "MISTRAL_LOW_MODEL");
         Self::set_model_if_exists(&mut config.mistral_medium_model, "MISTRAL_MEDIUM_MODEL");
         Self::set_model_if_exists(&mut config.mistral_high_model, "MISTRAL_HIGH_MODEL");
+        
+        // Validate that we have an API key for the selected provider
+        match config.provider {
+            AiProvider::Anthropic if config.anthropic_api_key.is_none() => {
+                return Err(AiError::Config("Missing ANTHROPIC_API_KEY for Anthropic provider".to_string()));
+            },
+            AiProvider::OpenAi if config.openai_api_key.is_none() => {
+                return Err(AiError::Config("Missing OPENAI_API_KEY for OpenAI provider".to_string()));
+            },
+            AiProvider::Mistral if config.mistral_api_key.is_none() => {
+                return Err(AiError::Config("Missing MISTRAL_API_KEY for Mistral provider".to_string()));
+            },
+            _ => {}
+        }
         
         Ok(config)
     }
@@ -117,8 +137,21 @@ impl AiConfig {
         }
     }
     
-    /// Get the default model name for the current provider configuration
-    pub fn get_default_model_name(&self) -> String {
-        self.get_model_name(self.provider, self.default_tier)
+    /// Get the API key for the specified provider
+    pub fn get_api_key(&self, provider: AiProvider) -> Result<String, AiError> {
+        match provider {
+            AiProvider::Anthropic => {
+                self.anthropic_api_key.clone()
+                    .ok_or_else(|| AiError::Config("Missing Anthropic API key".to_string()))
+            },
+            AiProvider::OpenAi => {
+                self.openai_api_key.clone()
+                    .ok_or_else(|| AiError::Config("Missing OpenAI API key".to_string()))
+            },
+            AiProvider::Mistral => {
+                self.mistral_api_key.clone()
+                    .ok_or_else(|| AiError::Config("Missing Mistral API key".to_string()))
+            },
+        }
     }
 }
