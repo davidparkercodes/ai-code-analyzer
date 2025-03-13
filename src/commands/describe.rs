@@ -29,11 +29,9 @@ pub async fn execute(path: String, output: Option<String>, no_parallel: bool) {
         Ok(description) => {
             let elapsed = start_time.elapsed();
             
-            // Format markdown for console and print
             println!("\n{}\n", render_markdown(&description));
             style::print_success(&format!("✨ Description generated in {:.2?}", elapsed));
             
-            // Export the description if requested
             if let Some(output_path) = output {
                 let path_display = output_path.clone();
                 match std::fs::write(output_path, description) {

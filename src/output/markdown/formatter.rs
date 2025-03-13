@@ -26,7 +26,6 @@ pub fn format_markdown(markdown_text: &str) -> String {
                             output.push_str("\n\n");
                         }
                         
-                        // Use # characters for each heading level
                         let prefix = "#".repeat(level_num);
                         let styled_prefix = StyledText::new(&prefix)
                             .foreground(ThemeColors::HEADER)
@@ -50,7 +49,6 @@ pub fn format_markdown(markdown_text: &str) -> String {
                         code_block = true;
                         output.push_str("\n");
                         
-                        // Capture code language for syntax highlighting
                         if let pulldown_cmark::CodeBlockKind::Fenced(lang) = kind {
                             code_language = lang.to_string();
                             let lang_display = if !code_language.is_empty() {
@@ -75,12 +73,10 @@ pub fn format_markdown(markdown_text: &str) -> String {
                         }
                     }
                     Tag::List(first_item_number) => {
-                        // For lists, we want just a single newline before the list starts
                         if !output.is_empty() {
                             if !output.ends_with("\n") {
                                 output.push_str("\n");
                             } else if output.ends_with("\n\n") {
-                                // If we have multiple newlines, remove one to keep spacing consistent
                                 output.truncate(output.len() - 1);
                             }
                         }
@@ -94,21 +90,16 @@ pub fn format_markdown(markdown_text: &str) -> String {
                         list_stack.push(list_type);
                     }
                     Tag::Item => {
-                        // Ensure line break before list items, but avoid multiple blank lines
                         if !output.is_empty() {
                             if !output.ends_with("\n") {
                                 output.push_str("\n");
                             } else if output.ends_with("\n\n") {
-                                // If we already have multiple newlines, don't add more
                             } else if output.ends_with("\n") && !output.ends_with("\n\n") {
-                                // Just one newline, which is what we want for list items
                             }
                         }
                         
-                        // Calculate indent based on list nesting level
                         let indent = " ".repeat((list_stack.len() - 1) * 2);
                         
-                        // Format list item based on list type
                         if let Some(list_type) = list_stack.last_mut() {
                             match list_type {
                                 ListType::Unordered => {
@@ -126,7 +117,6 @@ pub fn format_markdown(markdown_text: &str) -> String {
                                             .foreground(Color::BrightGreen)
                                             .style(Style::Bold)
                                     ));
-                                    // Mutate the list element to increment the counter for next item
                                     if let Some(ListType::Ordered(n)) = list_stack.last_mut() {
                                         *n += 1;
                                     }
@@ -194,9 +184,7 @@ pub fn format_markdown(markdown_text: &str) -> String {
                             output.push_str("\n");
                         }
                     }
-                    Tag::Item => {
-                        // No special action needed for now
-                    }
+                    Tag::Item => {}
                     Tag::Emphasis => {
                         format_stack.pop();
                     }
@@ -227,13 +215,11 @@ pub fn format_markdown(markdown_text: &str) -> String {
                 flush_newlines(&mut output, &mut pending_newlines);
                 let text_str = text.to_string();
                 
-                // Check if we're in a list context and it's an empty text node
                 let is_in_list = !list_stack.is_empty();
                 if is_in_list && text_str.trim().is_empty() {
                     continue;
                 }
                 
-                // Apply formatting based on the current format context
                 let styled_text = if code_block {
                     format_code(&text_str, &code_language)
                 } else if let Some(format_type) = format_stack.last() {
@@ -282,7 +268,6 @@ pub fn format_markdown(markdown_text: &str) -> String {
             }
             Event::Code(code) => {
                 flush_newlines(&mut output, &mut pending_newlines);
-                // Inline code
                 output.push_str(&format!("`{}`",
                     StyledText::new(&code.to_string())
                         .foreground(Color::BrightYellow)
@@ -290,7 +275,6 @@ pub fn format_markdown(markdown_text: &str) -> String {
             }
             Event::Html(html) => {
                 flush_newlines(&mut output, &mut pending_newlines);
-                // Just pass through HTML as-is
                 output.push_str(&html.to_string());
             }
             Event::HardBreak => {

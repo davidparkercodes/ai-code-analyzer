@@ -12,7 +12,6 @@ use crate::metrics::language::LanguageDetector;
 use crate::output::style;
 use crate::util::parallel::ParallelProcessing;
 
-// Number of files to include in each batch for initial summarization
 const BATCH_SIZE: usize = 10;
 
 /// A structure to hold file content and metadata for AI analysis
@@ -90,8 +89,6 @@ impl CodeDescriptor {
         
         Ok(description)
     }
-    
-    // This is handled in the collect_files_impl method
     
     /// Exposed for file collection operation
     #[allow(dead_code)]
