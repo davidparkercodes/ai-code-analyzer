@@ -33,7 +33,7 @@ fn test_add_language_metrics() {
     lang_metrics.blank_lines = 100;
     lang_metrics.comment_lines = 200;
 
-    metrics.add_language_metrics(lang_metrics);
+    metrics.add_language_metrics(lang_metrics, "src/test_file.rs");
 
     assert_eq!(metrics.lines_of_code, 500);
     assert_eq!(metrics.blank_lines, 100);
@@ -47,7 +47,7 @@ fn test_add_language_metrics() {
     lang_metrics2.blank_lines = 50;
     lang_metrics2.comment_lines = 100;
 
-    metrics.add_language_metrics(lang_metrics2);
+    metrics.add_language_metrics(lang_metrics2, "src/other_file.rs");
 
     assert_eq!(metrics.lines_of_code, 800); // 500 + 300
     assert_eq!(metrics.blank_lines, 150); // 100 + 50
@@ -66,7 +66,7 @@ fn test_add_language_metrics() {
     js_metrics.blank_lines = 80;
     js_metrics.comment_lines = 120;
 
-    metrics.add_language_metrics(js_metrics);
+    metrics.add_language_metrics(js_metrics, "src/file.js");
 
     assert_eq!(metrics.lines_of_code, 1200); // 800 + 400
     assert_eq!(metrics.blank_lines, 230); // 150 + 80

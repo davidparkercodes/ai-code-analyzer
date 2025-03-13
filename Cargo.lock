@@ -363,6 +363,7 @@ dependencies = [
  "clap",
  "ignore",
  "predicates",
+ "regex",
  "tempfile",
  "walkdir",
 ]

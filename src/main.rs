@@ -2,6 +2,7 @@ mod analyzer;
 mod dependency;
 mod metrics;
 mod output;
+mod style;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -37,6 +38,12 @@ enum Commands {
         /// Output path for the DOT graph file (optional)
         #[arg(short, long)]
         output: Option<String>,
+    },
+    /// Analyze code style and generate style recommendations
+    Style {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
     },
 }
 
@@ -85,6 +92,22 @@ fn main() {
                 }
                 Err(e) => {
                     output::style::print_error(&format!("Error analyzing dependencies: {}", e));
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::Style { path } => {
+            let detector = style::detector::StyleDetector::new();
+            let reporter = style::reporter::StyleReporter::new();
+            
+            output::style::print_info(&format!("Analyzing code style in directory: {}", path));
+            
+            match detector.detect_styles(path) {
+                Ok(analysis) => {
+                    reporter.report(&analysis);
+                }
+                Err(e) => {
+                    output::style::print_error(&format!("Error analyzing code style: {}", e));
                     process::exit(1);
                 }
             }

@@ -23,14 +23,14 @@ fn test_reporter_report() {
     rust_metrics.lines_of_code = 300;
     rust_metrics.blank_lines = 60;
     rust_metrics.comment_lines = 120;
-    metrics.add_language_metrics(rust_metrics);
+    metrics.add_language_metrics(rust_metrics, "src/lib.rs");
 
     let mut js_metrics = LanguageMetrics::new("JavaScript".to_string());
     js_metrics.files = 3;
     js_metrics.lines_of_code = 150;
     js_metrics.blank_lines = 30;
     js_metrics.comment_lines = 60;
-    metrics.add_language_metrics(js_metrics);
+    metrics.add_language_metrics(js_metrics, "src/main.js");
 
     let reporter = MetricsReporter::new();
 
