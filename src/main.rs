@@ -34,7 +34,7 @@ enum Commands {
         /// Path to analyze (defaults to current directory)
         #[arg(default_value = ".")]
         path: String,
-        
+
         /// Output path for the DOT graph file (optional)
         #[arg(short, long)]
         output: Option<String>,
@@ -73,18 +73,23 @@ fn main() {
         Commands::Dependencies { path, output } => {
             let analyzer = dependency::dependency_analyzer::DependencyAnalyzer::new();
             let reporter = dependency::dependency_reporter::DependencyReporter::new();
-            
+
             match analyzer.analyze_dependencies(path) {
                 Ok(graph) => {
                     reporter.report(&graph);
-                    
+
                     if let Some(output_path) = output {
                         match reporter.export_dot(&graph, output_path) {
                             Ok(_) => {
-                                output::style::print_success(&format!("Dependency graph exported successfully"));
+                                output::style::print_success(&format!(
+                                    "Dependency graph exported successfully"
+                                ));
                             }
                             Err(e) => {
-                                output::style::print_error(&format!("Error exporting dependency graph: {}", e));
+                                output::style::print_error(&format!(
+                                    "Error exporting dependency graph: {}",
+                                    e
+                                ));
                                 process::exit(1);
                             }
                         }
@@ -99,12 +104,15 @@ fn main() {
         Commands::Style { path } => {
             let detector = style::detector::StyleDetector::new();
             let reporter = style::reporter::StyleReporter::new();
-            
+
             // Using current directory if path is not specified
             let target_path = if path.is_empty() { "." } else { &path };
-            
-            output::style::print_info(&format!("Analyzing code style in directory: {}", target_path));
-            
+
+            output::style::print_info(&format!(
+                "Analyzing code style in directory: {}",
+                target_path
+            ));
+
             match detector.detect_styles(target_path) {
                 Ok(analysis) => {
                     reporter.report(&analysis);

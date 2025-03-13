@@ -22,10 +22,13 @@ impl FileAnalyzer {
 
     pub fn analyze_file<P: AsRef<Path>>(&self, file_path: P) -> Option<LanguageMetrics> {
         let path = file_path.as_ref();
-        
-        let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
         let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-        
+
         let language = if extension.is_empty() && !file_name.is_empty() {
             self.language_detector.detect_by_filename(file_name)
         } else {

@@ -9,17 +9,17 @@ fn test_style_detector_basics() {
     // Create a temporary directory for the test
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path();
-    
+
     // Create a rust file with specific styling
     create_test_rust_file(&temp_path.join("test_file.rs"));
-    
+
     // Run the detector
     let detector = StyleDetector::new();
     let analysis = detector.detect_styles(temp_path).unwrap();
-    
+
     // Verify the analysis has content
     assert!(!analysis.file_profiles.is_empty());
-    
+
     // Check that the consistency score is a valid value
     assert!(analysis.consistency_score >= 0.0 && analysis.consistency_score <= 1.0);
 }
@@ -29,39 +29,45 @@ fn test_style_detection_indentation() {
     // Create a temporary directory for the test
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path();
-    
+
     // Create files with different indentation styles
     create_file_with_spaces(&temp_path.join("spaces.rs"), 4);
     create_file_with_tabs(&temp_path.join("tabs.rs"));
-    
+
     // Run the detector
     let detector = StyleDetector::new();
     let analysis = detector.detect_styles(temp_path).unwrap();
-    
+
     // Verify the analysis contains both files
     assert_eq!(analysis.file_profiles.len(), 2);
-    
+
     // Verify the indentation was detected correctly
     let spaces_path = temp_path.join("spaces.rs").to_string_lossy().to_string();
     if let Some(spaces_profile) = analysis.file_profiles.get(&spaces_path) {
         match &spaces_profile.indentation {
             IndentationType::Spaces(n) => assert_eq!(*n, 4),
-            _ => panic!("Expected Spaces(4) indentation, got {:?}", spaces_profile.indentation),
+            _ => panic!(
+                "Expected Spaces(4) indentation, got {:?}",
+                spaces_profile.indentation
+            ),
         }
     } else {
         panic!("spaces.rs profile not found");
     }
-    
+
     let tabs_path = temp_path.join("tabs.rs").to_string_lossy().to_string();
     if let Some(tabs_profile) = analysis.file_profiles.get(&tabs_path) {
         match &tabs_profile.indentation {
             IndentationType::Tabs => (),
-            _ => panic!("Expected Tabs indentation, got {:?}", tabs_profile.indentation),
+            _ => panic!(
+                "Expected Tabs indentation, got {:?}",
+                tabs_profile.indentation
+            ),
         }
     } else {
         panic!("tabs.rs profile not found");
     }
-    
+
     // Verify that indentation inconsistencies were detected
     assert!(!analysis.inconsistencies.is_empty());
 }
@@ -121,7 +127,8 @@ impl TestStruct {
 
 fn create_file_with_spaces(path: &Path, spaces: usize) {
     let indent = " ".repeat(spaces);
-    let content = format!(r#"
+    let content = format!(
+        r#"
 fn main() {{
 {0}println!("Hello, world!");
 {0}let x = 42;
@@ -129,7 +136,9 @@ fn main() {{
 {0}{0}println!("Greater than 40");
 {0}}}
 }}
-"#, indent);
+"#,
+        indent
+    );
 
     fs::write(path, content).unwrap();
 }

@@ -4,9 +4,9 @@ use crate::dependency::dependency_analyzer::DependencyAnalyzer;
 use crate::dependency::dependency_reporter::DependencyReporter;
 use crate::metrics::collector::MetricsCollector;
 use crate::metrics::reporter::MetricsReporter;
+use crate::output::style::*;
 use crate::style::detector::StyleDetector;
 use crate::style::reporter::StyleReporter;
-use crate::output::style::*;
 use std::path::Path;
 
 pub struct Analyzer {
@@ -42,9 +42,9 @@ impl Analyzer {
         // Analyze metrics
         let metrics = self.collector.collect_metrics(&path)?;
         self.reporter.report(&metrics);
-        
+
         println!("");
-        
+
         // Analyze dependencies
         match self.dependency_analyzer.analyze_dependencies(&path) {
             Ok(graph) => {
@@ -55,9 +55,9 @@ impl Analyzer {
                 print_warning("Continuing with partial results...");
             }
         }
-        
+
         println!("");
-        
+
         // Analyze code style
         match self.style_detector.detect_styles(&path) {
             Ok(analysis) => {

@@ -56,13 +56,13 @@ impl LanguageDetector {
             "JavaScript" | "TypeScript" | "C" | "C++" | "Java" | "Go" => {
                 ("//".to_string(), "/*".to_string(), "*/".to_string())
             }
-            "Python" | "Shell" | "Make" | "Docker" => ("#".to_string(), "".to_string(), "".to_string()),
+            "Python" | "Shell" | "Make" | "Docker" => {
+                ("#".to_string(), "".to_string(), "".to_string())
+            }
             "Ruby" => ("#".to_string(), "=begin".to_string(), "=end".to_string()),
             "HTML" | "CSS" => ("".to_string(), "<!--".to_string(), "-->".to_string()),
-            "Markdown" | "YAML" | "TOML" | "JSON" | "LockFile" | "Sample" | "GitConfig" |
-            "License" | "SystemFile" => {
-                ("".to_string(), "".to_string(), "".to_string())
-            }
+            "Markdown" | "YAML" | "TOML" | "JSON" | "LockFile" | "Sample" | "GitConfig"
+            | "License" | "SystemFile" => ("".to_string(), "".to_string(), "".to_string()),
             _ => ("".to_string(), "".to_string(), "".to_string()),
         }
     }

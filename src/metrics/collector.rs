@@ -32,7 +32,7 @@ impl MetricsCollector {
         }
 
         let mut metrics = CodeMetrics::new();
-        
+
         let walker = WalkBuilder::new(path)
             .hidden(false)
             .git_ignore(true)
@@ -40,11 +40,15 @@ impl MetricsCollector {
             .git_exclude(true)
             .filter_entry(|e| {
                 let path_str = e.path().to_string_lossy();
-                let file_name = e.path().file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-                !path_str.contains("/.git/") && 
-                !path_str.ends_with(".lock") && 
-                !path_str.ends_with(".gitignore") &&
-                file_name != ".DS_Store"
+                let file_name = e
+                    .path()
+                    .file_name()
+                    .map(|n| n.to_string_lossy())
+                    .unwrap_or_default();
+                !path_str.contains("/.git/")
+                    && !path_str.ends_with(".lock")
+                    && !path_str.ends_with(".gitignore")
+                    && file_name != ".DS_Store"
             })
             .build();
 
