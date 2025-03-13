@@ -2,49 +2,52 @@ use crate::description::CodeDescriptor;
 use crate::output::style;
 use crate::output::markdown::render_markdown;
 use crate::ai::AiConfig;
+use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
 use std::path::Path;
 
 pub async fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
+    match execute_describe_command(path, output, no_parallel).await {
+        Ok(_) => 0,  // Success exit code
+        Err(error) => handle_command_error(&error)
+    }
+}
+
+async fn execute_describe_command(
+    path: String, 
+    output: Option<String>, 
+    no_parallel: bool
+) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     
-    let ai_config = load_ai_configuration();
+    let ai_config = load_ai_configuration()?;
     let descriptor = initialize_code_descriptor(ai_config, parallel_enabled);
     
     display_analysis_header(&path);
     log_parallel_status(parallel_enabled);
     
     let start_time = Instant::now();
-    let description_result = generate_codebase_description(&descriptor, &path).await;
+    let description = generate_codebase_description(&descriptor, &path).await?;
     
-    match description_result {
-        Ok(description) => {
-            display_description_results(&description, start_time);
-            
-            if let Some(output_path) = output {
-                if let Err(exit_code) = export_description(&description, output_path) {
-                    return exit_code;
-                }
-            }
-            0
-        }
-        Err(error_message) => {
-            style::print_error(&error_message);
-            1
-        }
+    display_description_results(&description, start_time);
+    
+    if let Some(output_path) = output {
+        export_description(&description, output_path)?;
     }
+    
+    Ok(())
 }
 
-fn load_ai_configuration() -> AiConfig {
+fn load_ai_configuration() -> AppResult<AiConfig> {
     match AiConfig::from_env() {
-        Ok(config) => config,
+        Ok(config) => Ok(config),
         Err(error) => {
             style::print_warning(&format!(
-                "AI configuration error: {}. Some features may be limited.", 
+                "AI configuration error: {}. Using default configuration.", 
                 error
             ));
-            AiConfig::default()
+            Ok(AiConfig::default())
         }
     }
 }
@@ -62,9 +65,9 @@ fn display_analysis_header(directory_path: &str) {
 async fn generate_codebase_description(
     descriptor: &CodeDescriptor,
     directory_path: &str
-) -> Result<String, String> {
+) -> AppResult<String> {
     descriptor.describe_codebase(directory_path).await
-        .map_err(|error| format!("❌ Error generating description: {}", error))
+        .map_err(|error| AppError::Description(format!("❌ Error generating description: {}", error)))
 }
 
 fn display_description_results(description: &str, start_time: Instant) {
@@ -73,16 +76,14 @@ fn display_description_results(description: &str, start_time: Instant) {
     style::print_success(&format!("✨ Description generated in {:.2?}", elapsed));
 }
 
-fn export_description(content: &str, file_path: String) -> Result<(), i32> {
+fn export_description(content: &str, file_path: String) -> AppResult<()> {
     let path = Path::new(&file_path);
-    match std::fs::write(path, content) {
-        Ok(_) => {
-            style::print_success(&format!("📄 Description exported to {}", file_path));
-            Ok(())
-        }
-        Err(error) => {
-            style::print_error(&format!("❌ Error writing description: {}", error));
-            Err(1)
-        }
-    }
+    std::fs::write(path, content)
+        .map_err(|error| AppError::FileSystem { 
+            path: path.to_path_buf(), 
+            message: format!("Error writing description: {}", error) 
+        })?;
+    
+    style::print_success(&format!("📄 Description exported to {}", file_path));
+    Ok(())
 }
