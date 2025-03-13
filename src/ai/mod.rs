@@ -5,7 +5,7 @@ pub mod mistral;
 pub mod factory;
 
 pub use config::AiConfig;
-pub use factory::create_ai_provider;
+pub use factory::create_ai_model;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -40,29 +40,29 @@ impl std::str::FromStr for ModelTier {
     }
 }
 
-/// AI provider types supported by the application
+/// AI vendor types supported by the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AiProvider {
+pub enum AiVendor {
     Anthropic,
     OpenAi,
     Mistral,
 }
 
-impl Default for AiProvider {
+impl Default for AiVendor {
     fn default() -> Self {
-        AiProvider::Anthropic
+        AiVendor::Anthropic
     }
 }
 
-impl std::str::FromStr for AiProvider {
+impl std::str::FromStr for AiVendor {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "anthropic" => Ok(AiProvider::Anthropic),
-            "openai" => Ok(AiProvider::OpenAi),
-            "mistral" => Ok(AiProvider::Mistral),
-            _ => Err(format!("Invalid AI provider: {}", s)),
+            "anthropic" => Ok(AiVendor::Anthropic),
+            "openai" => Ok(AiVendor::OpenAi),
+            "mistral" => Ok(AiVendor::Mistral),
+            _ => Err(format!("Invalid AI vendor: {}", s)),
         }
     }
 }
@@ -85,11 +85,11 @@ pub enum AiError {
     Unknown(String),
 }
 
-/// Trait defining the common interface for all AI model providers
+/// Trait defining the common interface for all AI models
 #[async_trait]
-pub trait AiModelProvider: Send + Sync {
-    /// Returns the name of this provider
-    fn provider_name(&self) -> &'static str;
+pub trait AiModel: Send + Sync {
+    /// Returns the name of this vendor
+    fn vendor_name(&self) -> &'static str;
     
     /// Returns the currently active model name
     fn model_name(&self) -> String;

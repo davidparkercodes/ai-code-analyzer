@@ -1,4 +1,4 @@
-use crate::ai::{AiModelProvider, AiError, ModelTier, AiConfig, AiProvider};
+use crate::ai::{AiModel, AiError, ModelTier, AiConfig, AiVendor};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ impl MistralProvider {
             .unwrap_or_default();
             
         // Validate that we have an API key
-        let _api_key = config.get_api_key(AiProvider::Mistral)?;
+        let _api_key = config.get_api_key(AiVendor::Mistral)?;
             
         Ok(Self {
             config,
@@ -65,18 +65,18 @@ impl MistralProvider {
     
     /// Get the model name to use for the current tier
     fn get_model_name(&self) -> String {
-        self.config.get_model_name(crate::ai::AiProvider::Mistral, self.model_tier)
+        self.config.get_model_name(crate::ai::AiVendor::Mistral, self.model_tier)
     }
     
     /// Get the API key
     fn get_api_key(&self) -> Result<String, AiError> {
-        self.config.get_api_key(AiProvider::Mistral)
+        self.config.get_api_key(AiVendor::Mistral)
     }
 }
 
 #[async_trait]
-impl AiModelProvider for MistralProvider {
-    fn provider_name(&self) -> &'static str {
+impl AiModel for MistralProvider {
+    fn vendor_name(&self) -> &'static str {
         "Mistral AI"
     }
     

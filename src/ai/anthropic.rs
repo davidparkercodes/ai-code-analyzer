@@ -1,4 +1,4 @@
-use crate::ai::{AiModelProvider, AiError, ModelTier, AiConfig, AiProvider};
+use crate::ai::{AiModel, AiError, ModelTier, AiConfig, AiVendor};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ impl AnthropicProvider {
             .unwrap_or_default();
             
         // Validate that we have an API key
-        let _api_key = config.get_api_key(AiProvider::Anthropic)?;
+        let _api_key = config.get_api_key(AiVendor::Anthropic)?;
             
         Ok(Self {
             config,
@@ -65,18 +65,18 @@ impl AnthropicProvider {
     
     /// Get the model name to use for the current tier
     fn get_model_name(&self) -> String {
-        self.config.get_model_name(crate::ai::AiProvider::Anthropic, self.model_tier)
+        self.config.get_model_name(crate::ai::AiVendor::Anthropic, self.model_tier)
     }
     
     /// Get the API key
     fn get_api_key(&self) -> Result<String, AiError> {
-        self.config.get_api_key(AiProvider::Anthropic)
+        self.config.get_api_key(AiVendor::Anthropic)
     }
 }
 
 #[async_trait]
-impl AiModelProvider for AnthropicProvider {
-    fn provider_name(&self) -> &'static str {
+impl AiModel for AnthropicProvider {
+    fn vendor_name(&self) -> &'static str {
         "Anthropic Claude"
     }
     

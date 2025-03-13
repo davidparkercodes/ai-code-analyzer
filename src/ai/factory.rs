@@ -1,29 +1,29 @@
 use crate::ai::{
-    AiModelProvider, AiConfig, AiProvider, ModelTier, AiError,
+    AiModel, AiConfig, AiVendor, ModelTier, AiError,
     anthropic::AnthropicProvider,
     openai::OpenAiProvider,
     mistral::MistralProvider,
 };
 use std::sync::Arc;
 
-/// Create an AI provider based on the configuration
-pub fn create_ai_provider(
+/// Create an AI model instance based on the configuration
+pub fn create_ai_model(
     config: AiConfig, 
     tier: ModelTier
-) -> Result<Arc<dyn AiModelProvider>, AiError> {
-    // Create the appropriate provider based on the configuration
-    match config.provider {
-        AiProvider::Anthropic => {
-            let provider = AnthropicProvider::new(config, tier)?;
-            Ok(Arc::new(provider))
+) -> Result<Arc<dyn AiModel>, AiError> {
+    // Create the appropriate model based on the configuration
+    match config.vendor {
+        AiVendor::Anthropic => {
+            let model = AnthropicProvider::new(config, tier)?;
+            Ok(Arc::new(model))
         },
-        AiProvider::OpenAi => {
-            let provider = OpenAiProvider::new(config, tier)?;
-            Ok(Arc::new(provider))
+        AiVendor::OpenAi => {
+            let model = OpenAiProvider::new(config, tier)?;
+            Ok(Arc::new(model))
         },
-        AiProvider::Mistral => {
-            let provider = MistralProvider::new(config, tier)?;
-            Ok(Arc::new(provider))
+        AiVendor::Mistral => {
+            let model = MistralProvider::new(config, tier)?;
+            Ok(Arc::new(model))
         },
     }
 }
