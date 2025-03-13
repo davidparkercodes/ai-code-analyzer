@@ -14,8 +14,11 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
   - Maintain clear separation of concerns
 - Follow existing Rust formatting conventions
 - Use idiomatic Rust patterns
-- Only add comments to test files
+- Always add or update unit tests when adding or modifying functionality
+- Aim for high test coverage, especially for complex logic
+- Each public function/method should have corresponding test cases
 - Test files should include explanatory comments for test setup and assertions
+- Only add comments to test files, not implementation files
 - Prefer composition over inheritance
 - Code should be self-documenting where possible
 - Implement Default trait for structs with new() methods
