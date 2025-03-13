@@ -20,6 +20,13 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
   - **dependency_reporter.rs**: Reports and exports dependency data
 - **src/output/**: Output formatting utilities
   - **style.rs**: Console styling and formatting functions
+- **src/ai/**: AI integration
+  - **mod.rs**: Main AI module with provider trait
+  - **config.rs**: Configuration and environment setup
+  - **anthropic.rs**: Anthropic Claude models implementation
+  - **openai.rs**: OpenAI models implementation
+  - **mistral.rs**: Mistral models implementation
+  - **factory.rs**: Factory for creating AI providers
 - **tests/**: Test cases for all functionality
 
 ## Features
@@ -29,6 +36,30 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
 - Dependency analysis with graph visualization
 - Circular dependency detection
 - Export dependency graphs in DOT format
+- AI-powered code analysis using different providers and models
+
+## AI Integration
+- Support for multiple AI providers: Anthropic, OpenAI, Mistral
+- Tiered model selection (low, medium, high) for each provider
+- Configurable via environment variables for easy switching
+- Provider-specific model mapping:
+  - **Low tier**: Smaller, faster, cost-effective models for simple tasks
+  - **Medium tier**: Balanced models for regular analysis tasks
+  - **High tier**: Powerful models for complex code understanding
+
+### AI Environment Variables
+- `AI_PROVIDER`: Selected provider (anthropic, openai, mistral)
+- `AI_TIER`: Default model tier (low, medium, high)
+- `AI_API_KEY`: API key for the selected provider
+- `ANTHROPIC_LOW_MODEL`: Model name for Anthropic low tier
+- `ANTHROPIC_MEDIUM_MODEL`: Model name for Anthropic medium tier
+- `ANTHROPIC_HIGH_MODEL`: Model name for Anthropic high tier
+- `OPENAI_LOW_MODEL`: Model name for OpenAI low tier
+- `OPENAI_MEDIUM_MODEL`: Model name for OpenAI medium tier
+- `OPENAI_HIGH_MODEL`: Model name for OpenAI high tier
+- `MISTRAL_LOW_MODEL`: Model name for Mistral low tier
+- `MISTRAL_MEDIUM_MODEL`: Model name for Mistral medium tier
+- `MISTRAL_HIGH_MODEL`: Model name for Mistral high tier
 
 ## Command Line Interface
 - `cargo run -- run [path]`: Full analysis (metrics + dependencies)
