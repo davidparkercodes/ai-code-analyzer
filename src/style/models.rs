@@ -122,22 +122,4 @@ impl CodeStyleAnalysis {
             consistency_score: 0.0,
         }
     }
-    
-    pub fn add_inconsistency(&mut self, file_path: &str, description: &str, severity: InconsistencySeverity) {
-        self.inconsistencies.push(StyleInconsistency {
-            file_path: file_path.to_string(),
-            line_number: None,
-            description: description.to_string(),
-            severity,
-        });
-    }
-    
-    pub fn add_line_inconsistency(&mut self, file_path: &str, line_number: usize, description: &str, severity: InconsistencySeverity) {
-        self.inconsistencies.push(StyleInconsistency {
-            file_path: file_path.to_string(),
-            line_number: Some(line_number),
-            description: description.to_string(),
-            severity,
-        });
-    }
 }

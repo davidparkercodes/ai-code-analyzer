@@ -100,9 +100,12 @@ fn main() {
             let detector = style::detector::StyleDetector::new();
             let reporter = style::reporter::StyleReporter::new();
             
-            output::style::print_info(&format!("Analyzing code style in directory: {}", path));
+            // Using current directory if path is not specified
+            let target_path = if path.is_empty() { "." } else { &path };
             
-            match detector.detect_styles(path) {
+            output::style::print_info(&format!("Analyzing code style in directory: {}", target_path));
+            
+            match detector.detect_styles(target_path) {
                 Ok(analysis) => {
                     reporter.report(&analysis);
                 }

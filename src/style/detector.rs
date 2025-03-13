@@ -5,8 +5,6 @@ use std::path::Path;
 use regex::Regex;
 
 const LINE_LENGTH_LIMIT: usize = 100;
-const FUNCTION_LENGTH_LIMIT: usize = 50;
-const PARAM_COUNT_LIMIT: usize = 5;
 
 pub struct StyleDetector {
     language_extensions: HashMap<String, String>,
