@@ -77,7 +77,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
     
     // Load AI configuration (fails silently if no .env file)
-    let ai_config = match AiConfig::from_env() {
+    let _ai_config = match AiConfig::from_env() {
         Ok(config) => config,
         Err(e) => {
             output::style::print_warning(&format!("AI configuration error: {}. Some features may be limited.", e));

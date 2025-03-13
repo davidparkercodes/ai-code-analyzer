@@ -7,6 +7,7 @@ use crate::ai::{
 use std::sync::Arc;
 
 /// Create an AI model instance based on the configuration
+#[allow(unused)]
 pub fn create_ai_model(
     config: AiConfig, 
     tier: ModelTier
