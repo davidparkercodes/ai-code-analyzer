@@ -1,6 +1,7 @@
 use crate::cache::AnalysisCache;
 use crate::dependency::dependency_graph::DependencyGraph;
 use crate::metrics::language::LanguageDetector;
+use crate::util::error::{AppError, AppResult};
 use crate::util::parallel::ParallelProcessing;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
@@ -75,15 +76,15 @@ impl DependencyAnalyzer {
         analyzer
     }
     
-    pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> Result<DependencyGraph, String> {
+    pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<DependencyGraph> {
         let path = dir_path.as_ref();
         
         if !path.exists() {
-            return Err(format!("Path '{}' does not exist", path.display()));
+            return Err(AppError::Analysis(format!("Path '{}' does not exist", path.display())));
         }
         
         if !path.is_dir() {
-            return Err(format!("Path '{}' is not a directory", path.display()));
+            return Err(AppError::Analysis(format!("Path '{}' is not a directory", path.display())));
         }
         
         let graph = Arc::new(Mutex::new(DependencyGraph::new()));
@@ -207,7 +208,11 @@ impl DependencyAnalyzer {
         // Purge any stale entries from the cache periodically
         self.cache.purge_stale_entries();
         
-        let final_graph = graph.lock().unwrap().clone();
+        let final_graph = match graph.lock() {
+            Ok(guard) => guard.clone(),
+            Err(e) => return Err(AppError::Analysis(format!("Error accessing dependency graph: {}", e)))
+        };
+        
         Ok(final_graph)
     }
     
