@@ -263,8 +263,7 @@ impl CodeDescriptor {
         let mut summaries = Vec::new();
         
         // Create the low-tier AI model
-        let low_tier_model = factory::create_ai_model(self.ai_config.clone(), ModelTier::Low)
-            .map_err(|e| format!("Failed to create AI model: {}", e))?;
+        let low_tier_model = self.create_low_tier_model()?;
         
         style::print_info("Generating batch summaries with AI...");
         style::print_info(&format!("Processing {} batch(es) with low-tier model", batches.len()));
@@ -272,47 +271,91 @@ impl CodeDescriptor {
         // We'll process each batch sequentially, regardless of the parallel flag
         // This is to avoid async runtime issues
         for (batch_index, batch) in batches.iter().enumerate() {
-            // Format batch description for logging
-            let batch_desc = if batch.base_path.is_empty() {
-                "root directory".to_string()
-            } else {
-                batch.base_path.clone()
-            };
+            let batch_desc = self.format_batch_description(batch);
             let file_count = batch.files.len();
             
             // Log batch beginning
-            style::print_info(&format!("🔍 [Batch {}/{}] Processing {} files from {}", 
-                batch_index + 1, 
+            self.log_batch_processing_start(batch_index, batches.len(), file_count, &batch_desc);
+            
+            // Format files and create prompt
+            let file_texts = self.prepare_files_for_analysis(&batch.files);
+            let prompt = self.create_batch_analysis_prompt(&batch.base_path, &file_texts);
+            
+            // Call the AI model and process result
+            self.process_batch_result(
+                &low_tier_model, 
+                &prompt, 
+                &mut summaries, 
+                batch_index, 
                 batches.len(), 
-                file_count,
-                batch_desc
-            ));
-            
-            // Prepare the files for the prompt
-            let mut file_texts = Vec::new();
-            
-            for file in &batch.files {
-                // Limit content to first 1000 lines to avoid overloading the model
-                let content = file.content.lines()
-                    .take(1000)
-                    .collect::<Vec<&str>>()
-                    .join("\n");
-                
-                // Format file info
-                let file_text = format!(
-                    "File: {}\nLanguage: {}\n\n```{}\n{}\n```\n",
-                    file.path,
-                    file.language,
-                    file.language.to_lowercase(),
-                    content
-                );
-                
-                file_texts.push(file_text);
-            }
-            
-            // Create the prompt
-            let prompt = format!(
-                "You are an expert software developer analyzing a codebase. 
+                file_count, 
+                &batch_desc
+            ).await;
+        }
+        
+        Ok(summaries)
+    }
+    
+    // Create a low-tier AI model for batch processing
+    fn create_low_tier_model(&self) -> Result<Box<dyn AiModel>, String> {
+        factory::create_ai_model(self.ai_config.clone(), ModelTier::Low)
+            .map_err(|e| format!("Failed to create AI model: {}", e))
+    }
+    
+    // Format batch description for logging
+    fn format_batch_description(&self, batch: &FileBatch) -> String {
+        if batch.base_path.is_empty() {
+            "root directory".to_string()
+        } else {
+            batch.base_path.clone()
+        }
+    }
+    
+    // Log the start of batch processing
+    fn log_batch_processing_start(&self, batch_index: usize, total_batches: usize, file_count: usize, batch_desc: &str) {
+        style::print_info(&format!(
+            "🔍 [Batch {}/{}] Processing {} files from {}", 
+            batch_index + 1, 
+            total_batches, 
+            file_count,
+            batch_desc
+        ));
+    }
+    
+    // Format all files in a batch for AI analysis
+    fn prepare_files_for_analysis(&self, files: &[FileData]) -> Vec<String> {
+        let mut file_texts = Vec::new();
+        
+        for file in files {
+            let formatted_file = self.format_file_for_analysis(file);
+            file_texts.push(formatted_file);
+        }
+        
+        file_texts
+    }
+    
+    // Format a single file for AI analysis
+    fn format_file_for_analysis(&self, file: &FileData) -> String {
+        // Limit content to first 1000 lines to avoid overloading the model
+        let content = file.content.lines()
+            .take(1000)
+            .collect::<Vec<&str>>()
+            .join("\n");
+        
+        // Format file info
+        format!(
+            "File: {}\nLanguage: {}\n\n```{}\n{}\n```\n",
+            file.path,
+            file.language,
+            file.language.to_lowercase(),
+            content
+        )
+    }
+    
+    // Create the AI prompt for batch analysis
+    fn create_batch_analysis_prompt(&self, directory: &str, file_texts: &[String]) -> String {
+        format!(
+            "You are an expert software developer analyzing a codebase. 
 Below are files from the same directory or related functionality in a project. 
 Analyze these files and provide a concise summary (3-5 paragraphs) about: 
 1. What functionality this code provides 
@@ -325,33 +368,52 @@ Be specific about what the code does but don't waste words simply listing files.
 Focus on explaining the overall purpose and functionality.
 
 Directory: {}\n\n{}",
-                batch.base_path,
-                file_texts.join("\n\n")
-            );
-            
-            // Call the AI model
-            match low_tier_model.generate_response(&prompt).await {
-                Ok(text) => {
-                    summaries.push(text);
-                    // Log successful completion
-                    style::print_info(&format!("✅ [Batch {}/{}] Successfully summarized {} files from {}", 
-                        batch_index + 1, 
-                        batches.len(), 
-                        file_count,
-                        batch_desc
-                    ));
-                },
-                Err(e) => {
-                    style::print_warning(&format!("❌ [Batch {}/{}] Failed to summarize batch: {}", 
-                        batch_index + 1, 
-                        batches.len(), 
-                        e
-                    ));
-                }
+            directory,
+            file_texts.join("\n\n")
+        )
+    }
+    
+    // Process the result of an AI batch analysis
+    async fn process_batch_result(
+        &self, 
+        model: &Box<dyn AiModel>, 
+        prompt: &str, 
+        summaries: &mut Vec<String>,
+        batch_index: usize, 
+        total_batches: usize, 
+        file_count: usize, 
+        batch_desc: &str
+    ) {
+        match model.generate_response(prompt).await {
+            Ok(text) => {
+                summaries.push(text);
+                self.log_batch_success(batch_index, total_batches, file_count, batch_desc);
+            },
+            Err(e) => {
+                self.log_batch_failure(batch_index, total_batches, &e);
             }
         }
-        
-        Ok(summaries)
+    }
+    
+    // Log successful batch processing
+    fn log_batch_success(&self, batch_index: usize, total_batches: usize, file_count: usize, batch_desc: &str) {
+        style::print_info(&format!(
+            "✅ [Batch {}/{}] Successfully summarized {} files from {}", 
+            batch_index + 1, 
+            total_batches, 
+            file_count,
+            batch_desc
+        ));
+    }
+    
+    // Log failed batch processing
+    fn log_batch_failure(&self, batch_index: usize, total_batches: usize, error: &dyn std::fmt::Display) {
+        style::print_warning(&format!(
+            "❌ [Batch {}/{}] Failed to summarize batch: {}", 
+            batch_index + 1, 
+            total_batches, 
+            error
+        ));
     }
     
     /// Generate the final description using the high-tier AI model
