@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
 pub struct DependencyGraph {
     nodes: HashSet<String>,
     edges: HashMap<String, HashSet<String>>,

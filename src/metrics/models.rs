@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CodeMetrics {
     // Overall totals
     pub total_files: usize,
@@ -36,6 +36,16 @@ pub struct LanguageMetrics {
     pub lines_of_code: usize,
     pub blank_lines: usize,
     pub comment_lines: usize,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct FileMetrics {
+    pub path: String,
+    pub language: String,
+    pub lines_of_code: usize,
+    pub blank_lines: usize,
+    pub comment_lines: usize,
+    pub is_test_file: bool,
 }
 
 impl CodeMetrics {

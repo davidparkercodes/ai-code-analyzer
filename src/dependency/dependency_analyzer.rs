@@ -1,13 +1,18 @@
+use crate::cache::AnalysisCache;
 use crate::dependency::dependency_graph::DependencyGraph;
 use crate::metrics::language::LanguageDetector;
-use ignore::WalkBuilder;
+use ignore::{DirEntry, WalkBuilder};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 pub struct DependencyAnalyzer {
     language_detector: LanguageDetector,
     supported_languages: HashMap<String, Vec<String>>,
+    cache: Arc<AnalysisCache>,
+    parallel: bool,
 }
 
 impl Default for DependencyAnalyzer {
@@ -43,7 +48,20 @@ impl DependencyAnalyzer {
         DependencyAnalyzer {
             language_detector: LanguageDetector::new(),
             supported_languages,
+            cache: Arc::new(AnalysisCache::new()),
+            parallel: true,
         }
+    }
+    
+    pub fn with_cache(cache: Arc<AnalysisCache>) -> Self {
+        let mut analyzer = Self::new();
+        analyzer.cache = cache;
+        analyzer
+    }
+    
+    pub fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
     }
     
     pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> Result<DependencyGraph, String> {
@@ -57,7 +75,7 @@ impl DependencyAnalyzer {
             return Err(format!("Path '{}' is not a directory", path.display()));
         }
         
-        let mut graph = DependencyGraph::new();
+        let graph = Arc::new(Mutex::new(DependencyGraph::new()));
         
         let walker = WalkBuilder::new(path)
             .hidden(false)
@@ -92,47 +110,110 @@ impl DependencyAnalyzer {
                 !is_excluded_system_file && !is_test_file
             })
             .build();
-        
-        for result in walker {
-            let entry = match result {
-                Ok(entry) => entry,
-                Err(_) => continue,
-            };
             
+        // Collect all entries first to enable parallel processing
+        let entries: Vec<DirEntry> = walker
+            .filter_map(|result| {
+                match result {
+                    Ok(entry) => {
+                        if !entry.path().is_dir() {
+                            Some(entry) 
+                        } else {
+                            None
+                        }
+                    },
+                    Err(_) => None,
+                }
+            })
+            .collect();
+            
+        let process_entry = |entry: &DirEntry| {
             let path = entry.path();
+            let path_str = path.to_string_lossy().to_string();
             
-            if path.is_dir() {
-                continue;
+            // Try to get dependencies from cache first
+            if let Some(cached_deps) = self.cache.get_dependencies(&path_str) {
+                let normalized_path = self.normalize_path(path);
+                let mut graph_guard = graph.lock().unwrap();
+                graph_guard.add_node(&normalized_path);
+                
+                for dependency in cached_deps {
+                    let normalized_dependency = self.resolve_dependency(&normalized_path, &dependency);
+                    graph_guard.add_node(&normalized_dependency);
+                    graph_guard.add_edge(&normalized_path, &normalized_dependency);
+                }
+                return;
             }
             
             let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
             let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
             
-            let language = if extension.is_empty() && !file_name.is_empty() {
-                self.language_detector.detect_by_filename(file_name)
+            // Try to get language from cache first
+            let language = if let Some(cached_lang) = self.cache.get_language(&path_str) {
+                cached_lang
             } else {
-                self.language_detector.detect_language(extension)
+                let detected_lang = if extension.is_empty() && !file_name.is_empty() {
+                    self.language_detector.detect_by_filename(file_name)
+                } else {
+                    self.language_detector.detect_language(extension)
+                };
+                // Cache the detected language
+                self.cache.cache_language(&path_str, detected_lang.clone());
+                detected_lang
             };
             
             if self.supported_languages.contains_key(&language) {
                 if let Some(dependencies) = self.extract_dependencies(path, &language) {
                     let normalized_path = self.normalize_path(path);
-                    graph.add_node(&normalized_path);
+                    
+                    // Cache the dependencies
+                    self.cache.cache_dependencies(&path_str, dependencies.clone());
+                    
+                    let mut graph_guard = graph.lock().unwrap();
+                    graph_guard.add_node(&normalized_path);
                     
                     for dependency in dependencies {
                         let normalized_dependency = self.resolve_dependency(&normalized_path, &dependency);
-                        graph.add_node(&normalized_dependency);
-                        graph.add_edge(&normalized_path, &normalized_dependency);
+                        graph_guard.add_node(&normalized_dependency);
+                        graph_guard.add_edge(&normalized_path, &normalized_dependency);
                     }
                 }
             }
+        };
+        
+        if self.parallel {
+            // Process files in parallel
+            entries.par_iter().for_each(|entry| {
+                process_entry(entry);
+            });
+        } else {
+            // Process files sequentially
+            entries.iter().for_each(|entry| {
+                process_entry(entry);
+            });
         }
         
-        Ok(graph)
+        // Purge any stale entries from the cache periodically
+        self.cache.purge_stale_entries();
+        
+        let final_graph = graph.lock().unwrap().clone();
+        Ok(final_graph)
     }
     
     fn extract_dependencies(&self, file_path: &Path, language: &str) -> Option<Vec<String>> {
-        let content = fs::read_to_string(file_path).ok()?;
+        let path_str = file_path.to_string_lossy().to_string();
+        
+        // Try to get content from cache first
+        let content = if let Some(cached_content) = self.cache.get_file_content(&path_str) {
+            cached_content
+        } else if let Ok(file_content) = fs::read_to_string(file_path) {
+            // Cache the file content
+            self.cache.cache_file_content(&path_str, file_content.clone());
+            file_content
+        } else {
+            return None;
+        };
+        
         let import_patterns = self.supported_languages.get(language)?;
         
         let mut dependencies = Vec::new();
