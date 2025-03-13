@@ -28,7 +28,7 @@ use crate::util::parallel::ParallelProcessing;
 impl Analyzer {
     pub fn new() -> Self {
         let cache = Arc::new(AnalysisCache::new());
-        let collector = MetricsCollector::new().with_parallel(true);
+        let collector = MetricsCollector::new().enable_parallel_processing(true);
         let dependency_analyzer = DependencyAnalyzer::with_cache(Arc::clone(&cache));
         
         Analyzer {
