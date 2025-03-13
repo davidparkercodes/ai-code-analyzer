@@ -1,26 +1,25 @@
 use std::env;
-use code_analyzer::ai::{AiConfig, AiProvider, ModelTier};
+use code_analyzer::ai::{AiConfig, AiVendor, ModelTier};
 
 #[test]
 fn test_default_config() {
     let config = AiConfig::default();
     
     // Check default values
-    assert_eq!(config.provider, AiProvider::Anthropic);
-    assert_eq!(config.default_tier, ModelTier::Medium);
+    assert_eq!(config.vendor, AiVendor::Anthropic);
     
     // Check default model names
-    assert_eq!(config.get_model_name(AiProvider::Anthropic, ModelTier::Low), "claude-3-haiku-20240307");
-    assert_eq!(config.get_model_name(AiProvider::Anthropic, ModelTier::Medium), "claude-3-sonnet-20240229");
-    assert_eq!(config.get_model_name(AiProvider::Anthropic, ModelTier::High), "claude-3-opus-20240229");
+    assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::Low), "claude-3-haiku-20240307");
+    assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::Medium), "claude-3-sonnet-20240229");
+    assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::High), "claude-3-opus-20240229");
     
-    assert_eq!(config.get_model_name(AiProvider::OpenAi, ModelTier::Low), "gpt-3.5-turbo");
-    assert_eq!(config.get_model_name(AiProvider::OpenAi, ModelTier::Medium), "gpt-4");
-    assert_eq!(config.get_model_name(AiProvider::OpenAi, ModelTier::High), "gpt-4-turbo");
+    assert_eq!(config.get_model_name(AiVendor::OpenAi, ModelTier::Low), "gpt-3.5-turbo");
+    assert_eq!(config.get_model_name(AiVendor::OpenAi, ModelTier::Medium), "gpt-4");
+    assert_eq!(config.get_model_name(AiVendor::OpenAi, ModelTier::High), "gpt-4-turbo");
     
-    assert_eq!(config.get_model_name(AiProvider::Mistral, ModelTier::Low), "mistral-tiny");
-    assert_eq!(config.get_model_name(AiProvider::Mistral, ModelTier::Medium), "mistral-small");
-    assert_eq!(config.get_model_name(AiProvider::Mistral, ModelTier::High), "mistral-large");
+    assert_eq!(config.get_model_name(AiVendor::Mistral, ModelTier::Low), "mistral-tiny");
+    assert_eq!(config.get_model_name(AiVendor::Mistral, ModelTier::Medium), "mistral-small");
+    assert_eq!(config.get_model_name(AiVendor::Mistral, ModelTier::High), "mistral-large");
 }
 
 #[test]
@@ -39,34 +38,38 @@ fn test_model_tier_from_str() {
 }
 
 #[test]
-fn test_provider_from_str() {
-    assert_eq!("anthropic".parse::<AiProvider>().unwrap(), AiProvider::Anthropic);
-    assert_eq!("openai".parse::<AiProvider>().unwrap(), AiProvider::OpenAi);
-    assert_eq!("mistral".parse::<AiProvider>().unwrap(), AiProvider::Mistral);
+fn test_vendor_from_str() {
+    assert_eq!("anthropic".parse::<AiVendor>().unwrap(), AiVendor::Anthropic);
+    assert_eq!("openai".parse::<AiVendor>().unwrap(), AiVendor::OpenAi);
+    assert_eq!("mistral".parse::<AiVendor>().unwrap(), AiVendor::Mistral);
     
     // Case insensitive
-    assert_eq!("ANTHROPIC".parse::<AiProvider>().unwrap(), AiProvider::Anthropic);
-    assert_eq!("OPENAI".parse::<AiProvider>().unwrap(), AiProvider::OpenAi);
-    assert_eq!("MISTRAL".parse::<AiProvider>().unwrap(), AiProvider::Mistral);
+    assert_eq!("ANTHROPIC".parse::<AiVendor>().unwrap(), AiVendor::Anthropic);
+    assert_eq!("OPENAI".parse::<AiVendor>().unwrap(), AiVendor::OpenAi);
+    assert_eq!("MISTRAL".parse::<AiVendor>().unwrap(), AiVendor::Mistral);
     
-    // Invalid provider
-    assert!("invalid".parse::<AiProvider>().is_err());
+    // Invalid vendor
+    assert!("invalid".parse::<AiVendor>().is_err());
 }
 
 #[test]
-fn test_get_default_model_name() {
+fn test_api_keys() {
     let mut config = AiConfig::default();
     
-    // Default is Anthropic Medium
-    assert_eq!(config.get_default_model_name(), "claude-3-sonnet-20240229");
+    // Default has no API keys
+    assert!(config.anthropic_api_key.is_none());
+    assert!(config.openai_api_key.is_none());
+    assert!(config.mistral_api_key.is_none());
     
-    // Change provider
-    config.provider = AiProvider::OpenAi;
-    assert_eq!(config.get_default_model_name(), "gpt-4");
+    // Set API keys
+    config.anthropic_api_key = Some("test-anthropic-key".to_string());
+    config.openai_api_key = Some("test-openai-key".to_string());
+    config.mistral_api_key = Some("test-mistral-key".to_string());
     
-    // Change tier
-    config.default_tier = ModelTier::High;
-    assert_eq!(config.get_default_model_name(), "gpt-4-turbo");
+    // Test get_api_key method
+    assert_eq!(config.get_api_key(AiVendor::Anthropic).unwrap(), "test-anthropic-key");
+    assert_eq!(config.get_api_key(AiVendor::OpenAi).unwrap(), "test-openai-key");
+    assert_eq!(config.get_api_key(AiVendor::Mistral).unwrap(), "test-mistral-key");
 }
 
 #[test]
@@ -76,36 +79,41 @@ fn test_env_config() {
     
     // Save original values
     let original_provider = env::var("AI_PROVIDER").ok();
-    let original_tier = env::var("AI_TIER").ok();
-    let original_api_key = env::var("AI_API_KEY").ok();
+    let original_anthropic_key = env::var("ANTHROPIC_API_KEY").ok();
+    let original_openai_key = env::var("OPENAI_API_KEY").ok();
+    let original_mistral_key = env::var("MISTRAL_API_KEY").ok();
     
-    // Set test values
-    env::set_var("AI_PROVIDER", "openai");
-    env::set_var("AI_TIER", "high");
-    env::set_var("AI_API_KEY", "test-api-key");
-    env::set_var("OPENAI_HIGH_MODEL", "custom-gpt-model");
+    // Set test values - using unsafe blocks for env operations
+    unsafe {
+        env::set_var("AI_PROVIDER", "openai");
+        env::set_var("OPENAI_API_KEY", "test-openai-key");
+        env::set_var("OPENAI_HIGH_MODEL", "custom-gpt-model");
+    }
     
     // Test config loading
     let config = AiConfig::from_env().unwrap();
-    assert_eq!(config.provider, AiProvider::OpenAi);
-    assert_eq!(config.default_tier, ModelTier::High);
-    assert_eq!(config.api_key, "test-api-key");
-    assert_eq!(config.get_default_model_name(), "custom-gpt-model");
+    assert_eq!(config.vendor, AiVendor::OpenAi);
+    assert_eq!(config.openai_api_key.as_ref().unwrap(), "test-openai-key");
+    assert_eq!(config.get_model_name(AiVendor::OpenAi, ModelTier::High), "custom-gpt-model");
     
     // Clean up
-    env::remove_var("AI_PROVIDER");
-    env::remove_var("AI_TIER");
-    env::remove_var("AI_API_KEY");
-    env::remove_var("OPENAI_HIGH_MODEL");
+    unsafe {
+        env::remove_var("AI_PROVIDER");
+        env::remove_var("OPENAI_API_KEY");
+        env::remove_var("OPENAI_HIGH_MODEL");
     
-    // Restore original values if they existed
-    if let Some(val) = original_provider {
-        env::set_var("AI_PROVIDER", val);
-    }
-    if let Some(val) = original_tier {
-        env::set_var("AI_TIER", val);
-    }
-    if let Some(val) = original_api_key {
-        env::set_var("AI_API_KEY", val);
+        // Restore original values if they existed
+        if let Some(val) = original_provider {
+            env::set_var("AI_PROVIDER", val);
+        }
+        if let Some(val) = original_anthropic_key {
+            env::set_var("ANTHROPIC_API_KEY", val);
+        }
+        if let Some(val) = original_openai_key {
+            env::set_var("OPENAI_API_KEY", val);
+        }
+        if let Some(val) = original_mistral_key {
+            env::set_var("MISTRAL_API_KEY", val);
+        }
     }
 }

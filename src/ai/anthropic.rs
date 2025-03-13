@@ -25,9 +25,10 @@ struct AnthropicMessage {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(untagged)]
-enum AnthropicContent {
-    Text { text: String },
+struct AnthropicContent {
+    #[serde(rename = "type")]
+    content_type: String,
+    text: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,7 +93,8 @@ impl AiModel for AnthropicProvider {
             messages: vec![
                 AnthropicMessage {
                     role: "user".to_string(),
-                    content: vec![AnthropicContent::Text { 
+                    content: vec![AnthropicContent { 
+                        content_type: "text".to_string(),
                         text: prompt.to_string() 
                     }],
                 },

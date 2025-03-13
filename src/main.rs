@@ -2,6 +2,7 @@ mod ai;
 mod analyzer;
 mod cache;
 mod dependency;
+mod description;
 mod metrics;
 mod output;
 mod style_analyzer;
@@ -62,6 +63,20 @@ enum Commands {
         path: String,
         
         /// Output path for the style guide markdown file (optional)
+        #[arg(short, long)]
+        output: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+    },
+    /// Generate an AI-powered description of the codebase
+    Describe {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Output path for the description markdown file (optional)
         #[arg(short, long)]
         output: Option<String>,
         
@@ -184,6 +199,47 @@ async fn main() {
                 }
                 Err(e) => {
                     output::style::print_error(&format!("Error analyzing code style: {}", e));
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::Describe { path, output, no_parallel } => {
+            let descriptor = description::CodeDescriptor::new(_ai_config.clone())
+                .with_parallel(!no_parallel);
+            
+            output::style::print_header("🤖 Codebase Analysis and Description");
+            output::style::print_info(&format!("📂 Analyzing directory: {}", path));
+            
+            if !no_parallel {
+                output::style::print_info("⚡ Parallel processing: enabled");
+            } else {
+                output::style::print_info("🔄 Sequential processing: enabled");
+            }
+            
+            let start_time = std::time::Instant::now();
+            match descriptor.describe_codebase(path).await {
+                Ok(description) => {
+                    let elapsed = start_time.elapsed();
+                    
+                    // Format markdown for console and print
+                    println!("\n{}\n", output::markdown::render_markdown(&description));
+                    output::style::print_success(&format!("✨ Description generated in {:.2?}", elapsed));
+                    
+                    // Export the description if requested
+                    if let Some(output_path) = output {
+                        match std::fs::write(output_path, description) {
+                            Ok(_) => {
+                                output::style::print_success(&format!("📄 Description exported to {}", output_path));
+                            }
+                            Err(e) => {
+                                output::style::print_error(&format!("❌ Error writing description: {}", e));
+                                process::exit(1);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    output::style::print_error(&format!("❌ Error generating description: {}", e));
                     process::exit(1);
                 }
             }
