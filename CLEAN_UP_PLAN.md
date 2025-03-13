@@ -103,9 +103,13 @@ This document outlines our strategy for cleaning up the codebase according to Cl
   - ✅ Improved naming with more descriptive function names
   - ✅ Better parameter handling with more consistent use of references
 
-- **`src/output/markdown/syntax_highlighter.rs`**:
-  - Refactor `highlight_rust` to reduce complexity
-  - Break down into smaller functions
+- ✅ **`src/output/markdown/syntax_highlighter.rs`**:
+  - ✅ Refactored `highlight_rust` to use object-oriented design with `RustHighlighter` class
+  - ✅ Split into smaller, focused methods:
+    - ✅ `highlight_line` for processing each line
+    - ✅ `handle_string_literal`, `handle_char_literal`, `handle_comment` for token types
+    - ✅ `handle_regular_character` and `handle_token_boundary` for other characters
+    - ✅ `finalize_line_parts` and `join_line_parts` for result preparation
 
 ### Error Handling Improvements (All Modules)
 - Create consistent error handling strategy
