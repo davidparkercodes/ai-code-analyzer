@@ -1,4 +1,5 @@
 mod analyzer;
+mod dependency;
 mod metrics;
 mod output;
 
@@ -27,6 +28,16 @@ enum Commands {
         #[arg(default_value = ".")]
         path: String,
     },
+    /// Analyze dependencies and generate a dependency graph
+    Dependencies {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Output path for the DOT graph file (optional)
+        #[arg(short, long)]
+        output: Option<String>,
+    },
 }
 
 fn main() {
@@ -48,6 +59,32 @@ fn main() {
                 Ok(metrics) => reporter.report(&metrics),
                 Err(e) => {
                     output::style::print_error(&format!("Error analyzing directory: {}", e));
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::Dependencies { path, output } => {
+            let analyzer = dependency::dependency_analyzer::DependencyAnalyzer::new();
+            let reporter = dependency::dependency_reporter::DependencyReporter::new();
+            
+            match analyzer.analyze_dependencies(path) {
+                Ok(graph) => {
+                    reporter.report(&graph);
+                    
+                    if let Some(output_path) = output {
+                        match reporter.export_dot(&graph, output_path) {
+                            Ok(_) => {
+                                output::style::print_success(&format!("Dependency graph exported successfully"));
+                            }
+                            Err(e) => {
+                                output::style::print_error(&format!("Error exporting dependency graph: {}", e));
+                                process::exit(1);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    output::style::print_error(&format!("Error analyzing dependencies: {}", e));
                     process::exit(1);
                 }
             }

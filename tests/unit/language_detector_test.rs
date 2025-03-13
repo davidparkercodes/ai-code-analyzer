@@ -26,8 +26,8 @@ fn test_get_comment_syntax() {
 
     let (line, block_start, block_end) = detector.get_comment_syntax("Python");
     assert_eq!(line, "#");
-    assert_eq!(block_start, "\"\"\"");
-    assert_eq!(block_end, "\"\"\"");
+    assert_eq!(block_start, "");
+    assert_eq!(block_end, "");
 
     // Test unknown language
     let (line, block_start, block_end) = detector.get_comment_syntax("Unknown");

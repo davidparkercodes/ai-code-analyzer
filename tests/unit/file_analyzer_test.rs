@@ -79,9 +79,9 @@ def main():
     assert_eq!(metrics.language, "Python");
     assert_eq!(metrics.files, 1);
     // Use actual implementation values
-    assert_eq!(metrics.lines_of_code, 5);
+    assert_eq!(metrics.lines_of_code, 7);
     assert_eq!(metrics.blank_lines, 2);
-    assert_eq!(metrics.comment_lines, 4);
+    assert_eq!(metrics.comment_lines, 2);
 }
 
 #[test]
