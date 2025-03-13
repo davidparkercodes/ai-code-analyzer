@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::style_analyzer::pattern::{
-    BracketStyle, IndentationStyle, NamingConvention, StylePattern, StyleRule,
+    IndentationStyle, NamingConvention, StylePattern, StyleRule,
 };
 
 pub struct StyleReport {
@@ -37,6 +37,14 @@ impl StyleReport {
 
         // Group patterns by rule type and language
         for pattern in &self.patterns {
+            // Special handling for unrealistic line length patterns (too short to be real)
+            if let StyleRule::MaxLineLength(length) = pattern.rule {
+                if length < 20 {
+                    // Skip very short line length patterns as they're likely noise
+                    continue;
+                }
+            }
+            
             let rule_key = format!(
                 "{:?}_{}",
                 pattern.rule,
@@ -61,16 +69,9 @@ impl StyleReport {
     }
 
     pub fn generate_style_guide(&mut self) {
-        let dominant_patterns = self.get_dominant_patterns();
-        
-        if dominant_patterns.is_empty() {
-            self.style_guide = Some("No consistent style patterns were detected in the codebase.".to_string());
-            return;
-        }
-        
         let mut guide = String::new();
-        guide.push_str("# Code Style Guide\n\n");
-        guide.push_str("This style guide was automatically generated based on detected patterns in your codebase.\n\n");
+        guide.push_str("# Code Metrics Analysis\n\n");
+        guide.push_str("This analysis was automatically generated based on measured metrics in your codebase.\n\n");
         
         // Add language statistics
         guide.push_str("## Codebase Statistics\n\n");
@@ -87,19 +88,90 @@ impl StyleReport {
             guide.push_str("\n");
         }
         
-        // Group patterns by language
+        // Group patterns by language for organized output
         let mut lang_patterns: HashMap<String, Vec<&StylePattern>> = HashMap::new();
         
-        for pattern in dominant_patterns {
+        // Add patterns to language groups
+        for pattern in &self.patterns {
+            // Filter out unrealistic metrics
+            if let StyleRule::MaxLineLength(length) = pattern.rule {
+                if length < 20 {
+                    continue; // Skip unrealistically short line lengths
+                }
+            }
+            
             lang_patterns
                 .entry(pattern.language.clone())
                 .or_default()
                 .push(pattern);
         }
         
-        // Add language-specific style guides
+        // Generate language-specific metrics
         for (language, patterns) in lang_patterns {
-            guide.push_str(&format!("## {} Style Guide\n\n", language));
+            guide.push_str(&format!("## {} Metrics\n\n", language));
+            
+            // Line length metrics
+            let mut max_line_length = None;
+            let mut avg_line_length = None;
+            
+            for pattern in &patterns {
+                match pattern.rule {
+                    StyleRule::MaxLineLength(length) => {
+                        if let Some(current_max) = max_line_length {
+                            if length > current_max {
+                                max_line_length = Some(length);
+                            }
+                        } else {
+                            max_line_length = Some(length);
+                        }
+                    },
+                    StyleRule::AvgLineLength(length) => {
+                        avg_line_length = Some(length);
+                    },
+                    _ => {}
+                }
+            }
+            
+            if max_line_length.is_some() || avg_line_length.is_some() {
+                guide.push_str("### Line Length\n\n");
+                
+                if let Some(length) = max_line_length {
+                    guide.push_str(&format!("- Maximum line length: **{} characters**\n", length));
+                }
+                
+                if let Some(length) = avg_line_length {
+                    guide.push_str(&format!("- Average line length: **{} characters**\n", length));
+                }
+                
+                guide.push_str("\n");
+            }
+            
+            // Indentation 
+            if let Some(pattern) = patterns.iter().find(|p| {
+                matches!(p.rule, StyleRule::IndentationStyle(_))
+            }) {
+                guide.push_str("### Indentation\n\n");
+                
+                match &pattern.rule {
+                    StyleRule::IndentationStyle(style) => {
+                        match style {
+                            IndentationStyle::Spaces(n) => {
+                                guide.push_str(&format!("- **{} spaces** indentation detected ({}% of files)\n", 
+                                    n, (pattern.consistency * 100.0) as usize));
+                            }
+                            IndentationStyle::Tabs => {
+                                guide.push_str(&format!("- **Tab** indentation detected ({}% of files)\n", 
+                                    (pattern.consistency * 100.0) as usize));
+                            }
+                            IndentationStyle::Mixed => {
+                                guide.push_str("- **Mixed indentation** detected (both spaces and tabs)\n");
+                            }
+                        }
+                        guide.push_str("\n");
+                    }
+                    _ => {}
+                }
+            }
             
             // Naming conventions
             if let Some(pattern) = patterns.iter().find(|p| {
@@ -111,123 +183,33 @@ impl StyleReport {
                     StyleRule::NamingConvention(convention) => {
                         match convention {
                             NamingConvention::CamelCase => {
-                                guide.push_str("- Use **camelCase** for variable names and function names\n");
-                                guide.push_str("- Example: `someVariable`, `calculateTotal`\n\n");
+                                guide.push_str(&format!("- **camelCase** naming convention detected ({}% of identifiers)\n", 
+                                    (pattern.consistency * 100.0) as usize));
                             }
                             NamingConvention::PascalCase => {
-                                guide.push_str("- Use **PascalCase** for class and type names\n");
-                                guide.push_str("- Example: `UserAccount`, `DatabaseConnection`\n\n");
+                                guide.push_str(&format!("- **PascalCase** naming convention detected ({}% of identifiers)\n", 
+                                    (pattern.consistency * 100.0) as usize));
                             }
                             NamingConvention::SnakeCase => {
-                                guide.push_str("- Use **snake_case** for variable names and function names\n");
-                                guide.push_str("- Example: `user_account`, `calculate_total`\n\n");
+                                guide.push_str(&format!("- **snake_case** naming convention detected ({}% of identifiers)\n", 
+                                    (pattern.consistency * 100.0) as usize));
                             }
                             NamingConvention::ScreamingSnakeCase => {
-                                guide.push_str("- Use **SCREAMING_SNAKE_CASE** for constants\n");
-                                guide.push_str("- Example: `MAX_USERS`, `DEFAULT_TIMEOUT`\n\n");
-                            }
-                            NamingConvention::KebabCase => {
-                                guide.push_str("- Use **kebab-case** for filenames and URLs\n");
-                                guide.push_str("- Example: `user-profile.js`, `api-client.ts`\n\n");
+                                guide.push_str(&format!("- **SCREAMING_SNAKE_CASE** naming convention detected ({}% of identifiers)\n", 
+                                    (pattern.consistency * 100.0) as usize));
                             }
                             NamingConvention::Mixed => {
-                                guide.push_str("- Multiple naming conventions detected in the codebase\n");
-                                guide.push_str("- Consider standardizing on a single convention for each type of identifier\n\n");
+                                guide.push_str("- **Mixed naming conventions** detected in the codebase\n");
                                 
                                 if !pattern.examples.is_empty() {
-                                    guide.push_str("Examples found:\n\n");
+                                    guide.push_str("\nExamples of identifiers:\n\n");
                                     for example in &pattern.examples {
                                         guide.push_str(&format!("- `{}`\n", example));
                                     }
-                                    guide.push_str("\n");
                                 }
                             }
                         }
-                    }
-                    _ => {}
-                }
-            }
-            
-            // Indentation
-            if let Some(pattern) = patterns.iter().find(|p| {
-                matches!(p.rule, StyleRule::IndentationStyle(_))
-            }) {
-                guide.push_str("### Indentation\n\n");
-                
-                match &pattern.rule {
-                    StyleRule::IndentationStyle(style) => {
-                        match style {
-                            IndentationStyle::Spaces(n) => {
-                                guide.push_str(&format!("- Use **{} spaces** for indentation\n", n));
-                                guide.push_str("- Do not use tabs for indentation\n\n");
-                            }
-                            IndentationStyle::Tabs => {
-                                guide.push_str("- Use **tabs** for indentation\n");
-                                guide.push_str("- Do not use spaces for indentation\n\n");
-                            }
-                            IndentationStyle::Mixed => {
-                                guide.push_str("- **Mixed indentation** detected (both spaces and tabs)\n");
-                                guide.push_str("- Recommendation: Standardize on either spaces or tabs\n\n");
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            
-            // Bracket style
-            if let Some(pattern) = patterns.iter().find(|p| {
-                matches!(p.rule, StyleRule::BracketStyle(_))
-            }) {
-                guide.push_str("### Bracket Style\n\n");
-                
-                match &pattern.rule {
-                    StyleRule::BracketStyle(style) => {
-                        match style {
-                            BracketStyle::SameLine => {
-                                guide.push_str("- Place opening braces on the **same line** as declarations\n");
-                                if !pattern.examples.is_empty() {
-                                    guide.push_str("- Example:\n\n```\n");
-                                    guide.push_str(&pattern.examples[0]);
-                                    guide.push_str("\n```\n\n");
-                                }
-                            }
-                            BracketStyle::NewLine => {
-                                guide.push_str("- Place opening braces on a **new line** after declarations\n");
-                                if !pattern.examples.is_empty() {
-                                    guide.push_str("- Example:\n\n```\n");
-                                    guide.push_str(&pattern.examples[0]);
-                                    guide.push_str("\n```\n\n");
-                                }
-                            }
-                            BracketStyle::Mixed => {
-                                guide.push_str("- **Inconsistent bracket style** detected\n");
-                                guide.push_str("- Recommendation: Standardize on either same-line or new-line style\n\n");
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            
-            // Line length
-            if let Some(pattern) = patterns.iter().find(|p| {
-                matches!(p.rule, StyleRule::MaxLineLength(_))
-            }) {
-                guide.push_str("### Line Length\n\n");
-                
-                match &pattern.rule {
-                    StyleRule::MaxLineLength(length) => {
-                        guide.push_str(&format!("- Maximum line length: **{} characters**\n", length));
-                        guide.push_str("- Break long lines when they exceed this limit\n\n");
-                        
-                        if !pattern.examples.is_empty() {
-                            guide.push_str("Examples of long lines:\n\n");
-                            for example in &pattern.examples {
-                                guide.push_str(&format!("> {}\n", example));
-                            }
-                            guide.push_str("\n");
-                        }
+                        guide.push_str("\n");
                     }
                     _ => {}
                 }
@@ -241,55 +223,50 @@ impl StyleReport {
                 
                 match &pattern.rule {
                     StyleRule::FunctionSize(size) => {
-                        guide.push_str(&format!("- Maximum function length: **{} lines**\n", size));
-                        guide.push_str("- Keep functions concise and focused on a single responsibility\n\n");
+                        guide.push_str(&format!("- Average function length: **{} lines**\n", size));
+                        
+                        // Calculate percentile distribution if available
+                        if !pattern.examples.is_empty() {
+                            guide.push_str("\nFunction size examples:\n\n");
+                            for example in &pattern.examples {
+                                guide.push_str(&format!("- {}\n", example));
+                            }
+                        }
+                        guide.push_str("\n");
                     }
                     _ => {}
                 }
             }
             
-            // File organization
+            // Comment density
             if let Some(pattern) = patterns.iter().find(|p| {
-                matches!(p.rule, StyleRule::FileOrganization(_))
+                matches!(p.rule, StyleRule::CommentDensity(_))
             }) {
-                guide.push_str("### File Organization\n\n");
+                guide.push_str("### Comment Density\n\n");
                 
                 match &pattern.rule {
-                    StyleRule::FileOrganization(org) => {
-                        match org {
-                            crate::style_analyzer::pattern::FileOrganization::ImportsFirst => {
-                                guide.push_str("- Place all imports at the top of the file\n");
-                                guide.push_str("- Group imports logically (standard library, external, internal)\n\n");
-                            }
-                            crate::style_analyzer::pattern::FileOrganization::TypesBeforeFunctions => {
-                                guide.push_str("- Define types and classes before functions\n");
-                                guide.push_str("- Group related types together\n\n");
-                            }
-                            crate::style_analyzer::pattern::FileOrganization::FunctionsGroupedByVisibility => {
-                                guide.push_str("- Group functions by visibility (public, then private)\n");
-                                guide.push_str("- Keep related functions together\n\n");
-                            }
-                            crate::style_analyzer::pattern::FileOrganization::TestsAtEnd => {
-                                guide.push_str("- Place test functions at the end of the file\n");
-                                guide.push_str("- Group tests by the functionality they test\n\n");
-                            }
-                        }
+                    StyleRule::CommentDensity(density) => {
+                        guide.push_str(&format!("- Comment-to-code ratio: **{}%**\n", density));
+                        guide.push_str(&format!("- Approximately 1 comment line per {} lines of code\n\n", 
+                            if *density > 0 { 100 / *density } else { 0 }));
                     }
                     _ => {}
                 }
             }
         }
         
-        // Add general recommendations
-        guide.push_str("## General Recommendations\n\n");
-        guide.push_str("- Be consistent with the existing codebase style\n");
-        guide.push_str("- Use meaningful and descriptive names for variables, functions, and types\n");
-        guide.push_str("- Keep functions small and focused on a single responsibility\n");
-        guide.push_str("- Minimize nesting levels to improve readability\n");
-        guide.push_str("- Add meaningful comments for complex logic\n");
+        // Add general insights
+        guide.push_str("## Metrics Insights\n\n");
+        guide.push_str("- Line length: Most style guides recommend 80-120 characters maximum\n");
+        guide.push_str("- Indentation: Consistent indentation improves readability\n");
+        guide.push_str("- Function size: Smaller functions (under 20-30 lines) are generally more maintainable\n");
+        guide.push_str("- Comment density: Aim for self-documenting code with targeted comments for complex logic\n");
+        guide.push_str("- Naming conventions: Consistent naming styles improve code readability\n");
         
         self.style_guide = Some(guide);
     }
+    
+    // No longer needed - we're focusing only on concrete metrics
 
     pub fn get_style_guide(&self) -> Option<&str> {
         self.style_guide.as_deref()
@@ -298,7 +275,7 @@ impl StyleReport {
 
 impl fmt::Display for StyleReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "== Code Style Analysis Report ==")?;
+        writeln!(f, "== Code Metrics Analysis Report ==")?;
         
         // Language statistics
         writeln!(f, "\nLanguage Statistics:")?;
@@ -306,82 +283,104 @@ impl fmt::Display for StyleReport {
             writeln!(f, "  {}: {} files", language, count)?;
         }
         
-        // Dominant patterns
-        let dominant_patterns = self.get_dominant_patterns();
-        writeln!(f, "\nDominant Style Patterns:")?;
+        // Group patterns by language for organized display
+        let mut lang_patterns: HashMap<String, Vec<&StylePattern>> = HashMap::new();
         
-        if dominant_patterns.is_empty() {
-            writeln!(f, "  No consistent style patterns detected")?;
-        } else {
-            for pattern in dominant_patterns {
-                write!(f, "  [{}] ", pattern.language)?;
+        // Skip unrealistic metrics (like very short line lengths)
+        for pattern in &self.patterns {
+            // Filter out unrealistic metrics
+            if let StyleRule::MaxLineLength(length) = pattern.rule {
+                if length < 20 {
+                    continue; // Skip unrealistically short line lengths
+                }
+            }
+            
+            lang_patterns
+                .entry(pattern.language.clone())
+                .or_default()
+                .push(pattern);
+        }
+        
+        // Display metrics by language
+        for (language, patterns) in &lang_patterns {
+            writeln!(f, "\n{} Metrics:", language)?;
+            
+            // Line length metrics
+            let line_length_patterns: Vec<_> = patterns.iter()
+                .filter(|p| matches!(p.rule, StyleRule::MaxLineLength(_) | StyleRule::AvgLineLength(_)))
+                .collect();
                 
+            if !line_length_patterns.is_empty() {
+                for pattern in line_length_patterns {
+                    match &pattern.rule {
+                        StyleRule::MaxLineLength(length) => {
+                            writeln!(f, "  Max Line Length: {} chars", length)?;
+                        }
+                        StyleRule::AvgLineLength(length) => {
+                            writeln!(f, "  Avg Line Length: {} chars", length)?;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            
+            // Indentation
+            if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::IndentationStyle(_))) {
                 match &pattern.rule {
-                    StyleRule::NamingConvention(convention) => {
-                        write!(f, "Naming Convention: {:?}", convention)?;
-                    }
-                    StyleRule::MaxLineLength(length) => {
-                        write!(f, "Max Line Length: {} chars", length)?;
-                    }
                     StyleRule::IndentationStyle(style) => {
                         match style {
-                            IndentationStyle::Spaces(n) => write!(f, "Indentation: {} spaces", n)?,
-                            IndentationStyle::Tabs => write!(f, "Indentation: Tabs")?,
-                            IndentationStyle::Mixed => write!(f, "Indentation: Mixed (inconsistent)")?,
+                            IndentationStyle::Spaces(n) => {
+                                writeln!(f, "  Indentation: {} spaces ({}% of files)", 
+                                    n, (pattern.consistency * 100.0) as usize)?;
+                            }
+                            IndentationStyle::Tabs => {
+                                writeln!(f, "  Indentation: Tabs ({}% of files)", 
+                                    (pattern.consistency * 100.0) as usize)?;
+                            }
+                            IndentationStyle::Mixed => {
+                                writeln!(f, "  Indentation: Mixed (tabs and spaces)")?;
+                            }
                         }
                     }
-                    StyleRule::BracketStyle(style) => {
-                        write!(f, "Bracket Style: {:?}", style)?;
-                    }
-                    StyleRule::FunctionSize(size) => {
-                        write!(f, "Function Size: max {} lines", size)?;
-                    }
-                    StyleRule::FileOrganization(org) => {
-                        write!(f, "File Organization: {:?}", org)?;
-                    }
-                    StyleRule::Custom(name) => {
-                        write!(f, "Custom Rule: {}", name)?;
-                    }
+                    _ => {}
                 }
-                
-                writeln!(f, " ({}% consistent)", (pattern.consistency * 100.0) as usize)?;
             }
-        }
-        
-        // Suggestions for inconsistent patterns
-        let inconsistent_patterns: Vec<_> = self.patterns.iter()
-            .filter(|p| p.consistency < 0.7 && p.consistency > 0.0)
-            .collect();
             
-        if !inconsistent_patterns.is_empty() {
-            writeln!(f, "\nInconsistent Style Patterns:")?;
-            
-            for pattern in inconsistent_patterns {
-                write!(f, "  [{}] ", pattern.language)?;
-                
+            // Function size
+            if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::FunctionSize(_))) {
                 match &pattern.rule {
-                    StyleRule::NamingConvention(NamingConvention::Mixed) => {
-                        writeln!(f, "Mixed naming conventions detected ({}% consistent)",
-                            (pattern.consistency * 100.0) as usize)?;
+                    StyleRule::FunctionSize(size) => {
+                        writeln!(f, "  Avg Function Size: {} lines", size)?;
                     }
-                    StyleRule::BracketStyle(BracketStyle::Mixed) => {
-                        writeln!(f, "Inconsistent bracket style ({}% consistent)",
-                            (pattern.consistency * 100.0) as usize)?;
+                    _ => {}
+                }
+            }
+            
+            // Comment density
+            if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::CommentDensity(_))) {
+                match &pattern.rule {
+                    StyleRule::CommentDensity(density) => {
+                        writeln!(f, "  Comment Density: {}% (1 comment per {} code lines)", 
+                            density, if *density > 0 { 100 / *density } else { 0 })?;
                     }
-                    StyleRule::IndentationStyle(IndentationStyle::Mixed) => {
-                        writeln!(f, "Mixed indentation (tabs and spaces) ({}% consistent)",
-                            (pattern.consistency * 100.0) as usize)?;
+                    _ => {}
+                }
+            }
+            
+            // Naming conventions
+            if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::NamingConvention(_))) {
+                match &pattern.rule {
+                    StyleRule::NamingConvention(convention) => {
+                        writeln!(f, "  Naming Convention: {:?} ({}% consistent)", 
+                            convention, (pattern.consistency * 100.0) as usize)?;
                     }
-                    _ => {
-                        writeln!(f, "{:?} ({}% consistent)",
-                            pattern.rule, (pattern.consistency * 100.0) as usize)?;
-                    }
+                    _ => {}
                 }
             }
         }
         
-        // Style guide note
-        writeln!(f, "\nA comprehensive style guide based on these patterns is available.")?;
+        // Note about metrics report
+        writeln!(f, "\nA comprehensive metrics report is available.")?;
         
         Ok(())
     }

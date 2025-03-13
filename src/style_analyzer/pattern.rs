@@ -2,22 +2,20 @@ use std::collections::HashMap;
 
 /// Represents a coding style rule that can be detected and enforced
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[allow(dead_code)] // Some variants reserved for future use
 pub enum StyleRule {
     // Naming conventions
     NamingConvention(NamingConvention),
     
-    // Structural patterns
+    // Measurable metrics
     MaxLineLength(usize),
+    AvgLineLength(usize),
     IndentationStyle(IndentationStyle),
-    BracketStyle(BracketStyle),
     
-    // Language specific idioms
+    // Function metrics
     FunctionSize(usize),
-    FileOrganization(FileOrganization),
     
-    // Custom rule
-    Custom(String),
+    // Comment metrics
+    CommentDensity(usize), // Comments-to-code ratio as percentage
 }
 
 /// Represents a detected style pattern with its frequency in the codebase
@@ -59,12 +57,10 @@ impl StylePattern {
 
 /// Naming convention patterns
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[allow(dead_code)] // Some variants reserved for future use
 pub enum NamingConvention {
     CamelCase,
     PascalCase,
     SnakeCase,
-    KebabCase,
     ScreamingSnakeCase,
     Mixed,
 }
@@ -75,24 +71,6 @@ pub enum IndentationStyle {
     Spaces(usize),
     Tabs,
     Mixed,
-}
-
-/// Bracket placement style
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BracketStyle {
-    SameLine,
-    NewLine,
-    Mixed,
-}
-
-/// File organization patterns
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[allow(dead_code)] // Some variants reserved for future use
-pub enum FileOrganization {
-    ImportsFirst,
-    TypesBeforeFunctions,
-    FunctionsGroupedByVisibility,
-    TestsAtEnd,
 }
 
 /// Collection of style patterns by language and rule

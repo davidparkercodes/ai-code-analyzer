@@ -1,7 +1,7 @@
 // FileAnalyzer import removed as it's not used
 use crate::metrics::language::LanguageDetector;
 use crate::style_analyzer::pattern::{
-    BracketStyle, IndentationStyle, NamingConvention, StylePattern, StylePatternCollection, StyleRule,
+    IndentationStyle, NamingConvention, StylePattern, StylePatternCollection, StyleRule,
 };
 use ignore::WalkBuilder;
 use std::collections::HashMap;
@@ -115,14 +115,17 @@ impl StyleDetector {
         // Detect indentation style
         self.detect_indentation_style(content, language, patterns.clone());
         
-        // Detect bracket style
-        self.detect_bracket_style(content, language, patterns.clone());
-        
         // Detect naming conventions
         self.detect_naming_conventions(content, language, file_path, patterns.clone());
         
-        // Detect line length
-        self.detect_line_length(content, language, patterns);
+        // Detect line length metrics
+        self.detect_line_length(content, language, patterns.clone());
+        
+        // Detect comment density
+        self.detect_comment_density(content, language, patterns.clone());
+        
+        // Detect function size
+        self.detect_function_size(content, language, patterns);
     }
 
     fn detect_indentation_style(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
@@ -201,61 +204,194 @@ impl StyleDetector {
         }
     }
 
-    fn detect_bracket_style(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
-        // Simple heuristic for bracket style detection
-        let mut same_line_count = 0;
-        let mut new_line_count = 0;
-        
+    // Function to detect comment density (comments to code ratio)
+    fn detect_comment_density(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
         let lines: Vec<&str> = content.lines().collect();
         
-        for i in 0..lines.len().saturating_sub(1) {
-            let line = lines[i];
-            let next_line = lines[i + 1];
+        if lines.is_empty() {
+            return;
+        }
+        
+        // Count comment lines and code lines based on language-specific patterns
+        let mut comment_lines = 0;
+        let mut code_lines = 0;
+        
+        // Simple comment detection by language
+        let (single_line_comment, multi_line_start, multi_line_end) = match language.to_lowercase().as_str() {
+            "rust" => ("//", "/*", "*/"),
+            "javascript" | "typescript" | "java" | "c" | "cpp" | "c++" | "csharp" | "c#" => ("//", "/*", "*/"),
+            "python" => ("#", "\"\"\"", "\"\"\""),
+            "ruby" => ("#", "=begin", "=end"),
+            "html" | "xml" => ("", "<!--", "-->"),
+            "css" | "scss" | "sass" => ("//", "/*", "*/"),
+            "shell" | "bash" => ("#", "", ""),
+            _ => ("//", "/*", "*/"), // Default to C-style comments
+        };
+        
+        let mut in_multi_line_comment = false;
+        
+        for line in &lines {
+            let trimmed = line.trim();
             
-            // Check patterns like "function() {" vs "function()\n{"
-            if line.contains("(") && line.contains(")") {
-                if line.trim().ends_with("{") {
-                    same_line_count += 1;
-                } else if next_line.trim() == "{" {
-                    new_line_count += 1;
+            if trimmed.is_empty() {
+                continue; // Skip empty lines
+            }
+            
+            if in_multi_line_comment {
+                comment_lines += 1;
+                if !multi_line_end.is_empty() && trimmed.contains(multi_line_end) {
+                    in_multi_line_comment = false;
                 }
+            } else if !single_line_comment.is_empty() && trimmed.starts_with(single_line_comment) {
+                comment_lines += 1;
+            } else if !multi_line_start.is_empty() && trimmed.contains(multi_line_start) && 
+                     (!trimmed.contains(multi_line_end) || 
+                      trimmed.find(multi_line_start).unwrap() < trimmed.find(multi_line_end).unwrap()) {
+                comment_lines += 1;
+                in_multi_line_comment = true;
+            } else {
+                code_lines += 1;
             }
         }
         
-        let total_bracket_lines = same_line_count + new_line_count;
-        
-        if total_bracket_lines > 0 {
-            let style_rule = if same_line_count > 0 && new_line_count > 0 {
-                StyleRule::BracketStyle(BracketStyle::Mixed)
-            } else if same_line_count > 0 {
-                StyleRule::BracketStyle(BracketStyle::SameLine)
-            } else {
-                StyleRule::BracketStyle(BracketStyle::NewLine)
-            };
+        // Calculate comment density as percentage
+        let total_lines = comment_lines + code_lines;
+        if total_lines > 0 {
+            let density = (comment_lines as f64 * 100.0 / total_lines as f64) as usize;
+            
+            let style_rule = StyleRule::CommentDensity(density);
             
             let mut patterns_lock = patterns.lock().unwrap();
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(None);
             
-            // Find examples
-            for i in 0..lines.len().saturating_sub(2) {
-                if pattern.examples.len() >= 3 {
+            // Add examples of comments
+            let mut comment_examples = Vec::new();
+            in_multi_line_comment = false;
+            
+            for line in &lines {
+                if comment_examples.len() >= 3 {
                     break;
                 }
                 
-                let current = lines[i];
-                let next = lines[i + 1];
+                let trimmed = line.trim();
                 
-                if current.contains("(") && current.contains(")") {
-                    if current.trim().ends_with("{") && same_line_count > new_line_count {
-                        pattern.examples.push(current.to_string());
-                    } else if next.trim() == "{" && new_line_count > same_line_count {
-                        pattern.examples.push(format!("{}\n{}", current, next));
+                if in_multi_line_comment {
+                    comment_examples.push(line.to_string());
+                    if !multi_line_end.is_empty() && trimmed.contains(multi_line_end) {
+                        in_multi_line_comment = false;
                     }
+                } else if !single_line_comment.is_empty() && trimmed.starts_with(single_line_comment) {
+                    comment_examples.push(line.to_string());
+                } else if !multi_line_start.is_empty() && trimmed.contains(multi_line_start) {
+                    comment_examples.push(line.to_string());
+                    in_multi_line_comment = true;
                 }
             }
             
-            pattern.update_consistency(total_bracket_lines);
+            pattern.examples = comment_examples;
+            pattern.update_consistency(total_lines);
+            patterns_lock.add_pattern(pattern);
+        }
+    }
+    
+    // Function to detect function size
+    fn detect_function_size(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
+        let lines: Vec<&str> = content.lines().collect();
+        
+        if lines.is_empty() {
+            return;
+        }
+        
+        // Simplified function detection based on language
+        let (fn_keyword, fn_end) = match language.to_lowercase().as_str() {
+            "rust" => (Some("fn "), Some("}")),
+            "javascript" | "typescript" => (Some("function "), Some("}")),
+            "python" => (Some("def "), None),
+            "java" | "c++" | "c#" => (None, Some("}")), // Will use bracket counting instead
+            _ => (Some("fn "), Some("}")), // Default to Rust-like
+        };
+        
+        // Track functions and their sizes
+        let mut function_sizes = Vec::new();
+        let mut in_function = false;
+        let mut current_function_start = 0;
+        let mut bracket_count = 0;
+        
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            
+            if !in_function {
+                // Function start detection
+                if (fn_keyword.is_some() && trimmed.contains(fn_keyword.unwrap())) ||
+                   (fn_keyword.is_none() && (trimmed.contains(" class ") || trimmed.contains(" void ") || 
+                                          trimmed.contains(" int ") || trimmed.contains(" String "))) {
+                    in_function = true;
+                    current_function_start = i;
+                    bracket_count = 0;
+                    
+                    // Count opening brackets
+                    if trimmed.contains("{") {
+                        bracket_count += 1;
+                    }
+                }
+            } else {
+                // Function end detection
+                if let Some(end_marker) = fn_end {
+                    if trimmed.contains("{") {
+                        bracket_count += 1;
+                    }
+                    
+                    if trimmed.contains(end_marker) {
+                        bracket_count -= 1;
+                        
+                        if bracket_count <= 0 {
+                            // Function ended
+                            let function_size = i - current_function_start + 1;
+                            function_sizes.push(function_size);
+                            in_function = false;
+                        }
+                    }
+                } else {
+                    // For Python, use indentation level
+                    if i > current_function_start && !trimmed.is_empty() && !trimmed.starts_with(" ") && !trimmed.starts_with("\t") {
+                        // Function ended by indentation
+                        let function_size = i - current_function_start;
+                        function_sizes.push(function_size);
+                        in_function = false;
+                    }
+                }
+            }
+        }
+        
+        // Calculate average function size
+        if !function_sizes.is_empty() {
+            let total_size: usize = function_sizes.iter().sum();
+            let avg_size = total_size / function_sizes.len();
+            
+            let style_rule = StyleRule::FunctionSize(avg_size);
+            
+            let mut patterns_lock = patterns.lock().unwrap();
+            let mut pattern = StylePattern::new(style_rule, language);
+            pattern.add_occurrence(None);
+            
+            // Add examples
+            function_sizes.sort_unstable();
+            
+            // Min, median, max examples
+            if !function_sizes.is_empty() {
+                pattern.examples.push(format!("Smallest function: {} lines", function_sizes[0]));
+                
+                let median_idx = function_sizes.len() / 2;
+                if median_idx < function_sizes.len() {
+                    pattern.examples.push(format!("Median function: {} lines", function_sizes[median_idx]));
+                }
+                
+                let last_idx = function_sizes.len() - 1;
+                pattern.examples.push(format!("Largest function: {} lines", function_sizes[last_idx]));
+            }
+            
+            pattern.update_consistency(function_sizes.len());
             patterns_lock.add_pattern(pattern);
         }
     }
@@ -338,44 +474,32 @@ impl StyleDetector {
             return;
         }
         
-        // Collect line lengths
-        let mut length_counts = HashMap::new();
-        let mut total_lines = 0;
-        
-        for line in lines.iter() {
-            let len = line.len();
-            if len > 0 {
-                total_lines += 1;
-                
-                // Group line lengths by tens (80-89, 90-99, etc.)
-                let group = (len / 10) * 10;
-                *length_counts.entry(group).or_insert(0) += 1;
-            }
+        // Collect all non-empty line lengths
+        let mut line_lengths: Vec<usize> = lines.iter()
+            .map(|line| line.len())
+            .filter(|&len| len > 0)
+            .collect();
+            
+        if line_lengths.is_empty() {
+            return;
         }
         
-        if total_lines > 0 {
-            // We don't need to find the most common line length group
-            // as we're using the 95th percentile approach instead
-            
-            // Find 95th percentile line length
-            let mut sorted_lengths: Vec<usize> = Vec::new();
-            for line in lines.iter() {
-                if !line.trim().is_empty() {
-                    sorted_lengths.push(line.len());
-                }
-            }
-            sorted_lengths.sort_unstable();
-            
-            let p95_index = (sorted_lengths.len() as f64 * 0.95) as usize;
-            let p95_length = if p95_index < sorted_lengths.len() {
-                sorted_lengths[p95_index]
-            } else if !sorted_lengths.is_empty() {
-                sorted_lengths[sorted_lengths.len() - 1]
-            } else {
-                0
-            };
-            
-            let style_rule = StyleRule::MaxLineLength(p95_length);
+        // Calculate average line length
+        let total_length: usize = line_lengths.iter().sum();
+        let avg_length = total_length / line_lengths.len();
+        
+        // Find maximum line length (95th percentile to avoid outliers)
+        line_lengths.sort_unstable();
+        let p95_index = (line_lengths.len() as f64 * 0.95) as usize;
+        let max_length = if p95_index < line_lengths.len() {
+            line_lengths[p95_index]
+        } else {
+            line_lengths[line_lengths.len() - 1]
+        };
+        
+        // Add max line length metric
+        {
+            let style_rule = StyleRule::MaxLineLength(max_length);
             
             let mut patterns_lock = patterns.lock().unwrap();
             let mut pattern = StylePattern::new(style_rule, language);
@@ -399,7 +523,36 @@ impl StyleDetector {
                 }
             }
             
-            pattern.update_consistency(total_lines);
+            pattern.update_consistency(line_lengths.len());
+            patterns_lock.add_pattern(pattern);
+        }
+        
+        // Add average line length metric
+        {
+            let style_rule = StyleRule::AvgLineLength(avg_length);
+            
+            let mut patterns_lock = patterns.lock().unwrap();
+            let mut pattern = StylePattern::new(style_rule, language);
+            pattern.add_occurrence(None);
+            
+            // Add distribution examples
+            let p25_index = (line_lengths.len() as f64 * 0.25) as usize;
+            let p50_index = (line_lengths.len() as f64 * 0.50) as usize;
+            let p75_index = (line_lengths.len() as f64 * 0.75) as usize;
+            
+            if p25_index < line_lengths.len() {
+                pattern.examples.push(format!("25th percentile: {} chars", line_lengths[p25_index]));
+            }
+            
+            if p50_index < line_lengths.len() {
+                pattern.examples.push(format!("Median length: {} chars", line_lengths[p50_index]));
+            }
+            
+            if p75_index < line_lengths.len() {
+                pattern.examples.push(format!("75th percentile: {} chars", line_lengths[p75_index]));
+            }
+            
+            pattern.update_consistency(line_lengths.len());
             patterns_lock.add_pattern(pattern);
         }
     }
