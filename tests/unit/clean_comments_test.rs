@@ -20,7 +20,9 @@ fn test_clean_comments_from_rust_files() {
     let exit_code = clean_comments::execute(
         temp_path.to_str().unwrap().to_string(),
         Some(output_path.clone()),
-        true // no_parallel = true
+        true, // no_parallel = true
+        true, // no_git = true
+        true  // force = true
     );
     
     // Verify success
@@ -47,6 +49,16 @@ fn test_clean_comments_from_rust_files() {
     assert!(cleaned_file2.contains("value: i32,"));
     assert!(cleaned_file2.contains("/// Doc comment should remain"));
     assert!(!cleaned_file2.contains("// This should be removed"));
+    assert!(cleaned_file2.contains("// aicodeanalyzer: ignore"));
+    
+    // Check file 3 with ignore pattern
+    let cleaned_file3 = fs::read_to_string(
+        Path::new(&output_path).join("test3.rs")
+    ).unwrap();
+    
+    assert!(!cleaned_file3.contains("// This comment will be removed"));
+    assert!(cleaned_file3.contains("// aicodeanalyzer: ignore"));
+    assert!(!cleaned_file3.contains("// This comment will be removed"));
 }
 
 fn create_test_files(dir_path: &Path) {
@@ -63,9 +75,19 @@ fn main() {
 struct Test {
     /// Doc comment should remain
     value: i32, // This should be removed
+    name: String, // aicodeanalyzer: ignore
+}
+"#;
+    
+    // Test file 3 with ignore pattern
+    let file3_content = r#"// This comment will be removed
+fn test() {
+    // aicodeanalyzer: ignore
+    let y = 10; // This comment will be removed
 }
 "#;
     
     fs::write(dir_path.join("test1.rs"), file1_content).unwrap();
     fs::write(dir_path.join("test2.rs"), file2_content).unwrap();
+    fs::write(dir_path.join("test3.rs"), file3_content).unwrap();
 }

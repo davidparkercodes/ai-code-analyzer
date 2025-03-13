@@ -93,6 +93,14 @@ pub enum Commands {
         /// Disable parallel processing for large codebases
         #[arg(long)]
         no_parallel: bool,
+        
+        /// Skip Git operations (checking for repo, adding files, committing)
+        #[arg(long)]
+        no_git: bool,
+        
+        /// Force removing comments without asking for confirmation in non-git directories
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -103,6 +111,7 @@ pub async fn execute(cli: Cli) -> i32 {
         Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
         Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
         Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
-        Commands::CleanComments { path, output, no_parallel } => clean_comments::execute(path, output, no_parallel),
+        Commands::CleanComments { path, output, no_parallel, no_git, force } => 
+            clean_comments::execute(path, output, no_parallel, no_git, force),
     }
 }
