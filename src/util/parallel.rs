@@ -9,6 +9,7 @@ pub trait ParallelProcessing {
     ///
     /// This is the former name of this method, retained for backward compatibility.
     /// New code should use `enable_parallel_processing` instead.
+    #[allow(dead_code)]
     fn with_parallel(self, parallel: bool) -> Self;
     
     /// Get the current parallel processing setting
