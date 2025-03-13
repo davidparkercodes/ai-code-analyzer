@@ -260,13 +260,18 @@ impl StyleDetector {
             
             let leading_spaces = line.len() - line.trim_start().len();
             
-            if line.starts_with('\t') {
-                has_tabs = true;
-                lines_with_tabs.push(line_number);
-                indentation_by_line.insert(line_number, IndentationType::Tabs);
-            } else if leading_spaces > 0 {
-                *space_counts.entry(leading_spaces).or_insert(0) += 1;
-                indentation_by_line.insert(line_number, IndentationType::Spaces(leading_spaces));
+            // Only consider lines that would reveal indentation - typically those with a non-trivial amount of code
+            // and that start with whitespace
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && trimmed.len() < line.len() && trimmed.len() > 3 {
+                if line.starts_with('\t') {
+                    has_tabs = true;
+                    lines_with_tabs.push(line_number);
+                    indentation_by_line.insert(line_number, IndentationType::Tabs);
+                } else if leading_spaces > 0 {
+                    *space_counts.entry(leading_spaces).or_insert(0) += 1;
+                    indentation_by_line.insert(line_number, IndentationType::Spaces(leading_spaces));
+                }
             }
         }
         
@@ -347,17 +352,26 @@ impl StyleDetector {
                 for (i, line) in lines.iter().enumerate() {
                     let line_number = i + 1;
                     
-                    if same_line_pattern.is_match(line) {
-                        same_line += 1;
-                    }
-                    
-                    // For next line style, we need to check if this line has a closing parenthesis
-                    // and the next line has an opening brace
-                    if i < line_count - 1 && line.trim().ends_with(')') && lines[i+1].trim().starts_with('{') {
-                        next_line += 1;
-                        // Mark both this line and the next line
-                        inconsistent_lines.push(line_number);
-                        inconsistent_lines.push(line_number + 1);
+                    // Only consider actual function or method declarations for brace style
+                    // This helps avoid false positives from things like if statements, loops, etc.
+                    let trimmed = line.trim();
+                    if (trimmed.starts_with("fn ") || 
+                        trimmed.starts_with("pub fn ") || 
+                        trimmed.contains(" fn ")) && 
+                        trimmed.contains('(') {
+                        
+                        if same_line_pattern.is_match(line) {
+                            same_line += 1;
+                        }
+                        
+                        // For next line style, we need to check if this line has a closing parenthesis
+                        // and the next line has an opening brace
+                        if i < line_count - 1 && line.trim().ends_with(')') && lines[i+1].trim().starts_with('{') {
+                            next_line += 1;
+                            // Mark both this line and the next line
+                            inconsistent_lines.push(line_number);
+                            inconsistent_lines.push(line_number + 1);
+                        }
                     }
                 }
                 
@@ -441,13 +455,23 @@ impl StyleDetector {
                 max_length = line_len;
             }
             
-            if line_len > LINE_LENGTH_LIMIT {
-                over_limit += 1;
-                long_line_numbers.push(line_number);
+            // Only report long lines that have meaningful content
+            let trimmed = line.trim();
+            if line_len > LINE_LENGTH_LIMIT && trimmed.len() > 10 {
+                // Skip trivial lines that are just closing braces or similar
+                let non_trivial_chars = trimmed.chars()
+                    .filter(|&c| c != ' ' && c != '}' && c != ';' && c != ')' && c != '{')
+                    .count();
+                
+                // Only report if there's meaningful content
+                if non_trivial_chars > 3 {
+                    over_limit += 1;
+                    long_line_numbers.push(line_number);
+                }
             }
             
-            // Check trailing whitespace
-            if !line.is_empty() && (line.ends_with(' ') || line.ends_with('\t')) {
+            // Check trailing whitespace - but only mark non-empty and meaningful lines
+            if !line.trim().is_empty() && line.trim().len() > 3 && (line.ends_with(' ') || line.ends_with('\t')) {
                 trailing_whitespace += 1;
                 whitespace_line_numbers.push(line_number);
             }
