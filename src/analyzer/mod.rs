@@ -14,7 +14,6 @@ pub struct Analyzer {
     reporter: MetricsReporter,
     dependency_analyzer: DependencyAnalyzer,
     dependency_reporter: DependencyReporter,
-    cache: Arc<AnalysisCache>,
     parallel: bool,
 }
 
@@ -35,7 +34,6 @@ impl Analyzer {
             reporter: MetricsReporter::new(),
             dependency_analyzer,
             dependency_reporter: DependencyReporter::new(),
-            cache,
             parallel: true,
         }
     }

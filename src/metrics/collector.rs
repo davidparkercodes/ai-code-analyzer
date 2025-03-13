@@ -32,10 +32,6 @@ impl MetricsCollector {
         self.parallel = parallel;
         self
     }
-    
-    pub fn get_cache(&self) -> Arc<AnalysisCache> {
-        Arc::clone(&self.cache)
-    }
 
     pub fn collect_metrics<P: AsRef<Path>>(&self, dir_path: P) -> Result<CodeMetrics, String> {
         let path = dir_path.as_ref();

@@ -64,10 +64,6 @@ impl DependencyAnalyzer {
         self
     }
     
-    pub fn get_cache(&self) -> Arc<AnalysisCache> {
-        Arc::clone(&self.cache)
-    }
-    
     pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> Result<DependencyGraph, String> {
         let path = dir_path.as_ref();
         

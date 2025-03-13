@@ -97,13 +97,6 @@ impl AnalysisCache {
         None
     }
 
-    pub fn clear(&self) {
-        self.file_content_cache.clear();
-        self.language_cache.clear();
-        self.metrics_cache.clear();
-        self.dependency_cache.clear();
-    }
-
     pub fn purge_stale_entries(&self) {
         self.purge_stale_entries_from_cache(&self.file_content_cache);
         self.purge_stale_entries_from_cache(&self.language_cache);
