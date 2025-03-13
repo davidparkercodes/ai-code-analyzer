@@ -75,8 +75,14 @@ pub fn format_markdown(markdown_text: &str) -> String {
                         }
                     }
                     Tag::List(first_item_number) => {
-                        if !output.is_empty() && !output.ends_with("\n") {
-                            output.push_str("\n");
+                        // For lists, we want just a single newline before the list starts
+                        if !output.is_empty() {
+                            if !output.ends_with("\n") {
+                                output.push_str("\n");
+                            } else if output.ends_with("\n\n") {
+                                // If we have multiple newlines, remove one to keep spacing consistent
+                                output.truncate(output.len() - 1);
+                            }
                         }
                         
                         let list_type = if let Some(number) = first_item_number {
@@ -88,8 +94,15 @@ pub fn format_markdown(markdown_text: &str) -> String {
                         list_stack.push(list_type);
                     }
                     Tag::Item => {
-                        if !output.ends_with("\n") && !output.is_empty() {
-                            output.push_str("\n");
+                        // Ensure line break before list items, but avoid multiple blank lines
+                        if !output.is_empty() {
+                            if !output.ends_with("\n") {
+                                output.push_str("\n");
+                            } else if output.ends_with("\n\n") {
+                                // If we already have multiple newlines, don't add more
+                            } else if output.ends_with("\n") && !output.ends_with("\n\n") {
+                                // Just one newline, which is what we want for list items
+                            }
                         }
                         
                         // Calculate indent based on list nesting level
@@ -213,6 +226,13 @@ pub fn format_markdown(markdown_text: &str) -> String {
             Event::Text(text) => {
                 flush_newlines(&mut output, &mut pending_newlines);
                 let text_str = text.to_string();
+                
+                // Check if we're in a list context and it's an empty text node
+                let is_in_list = !list_stack.is_empty();
+                if is_in_list && text_str.trim().is_empty() {
+                    // Skip empty text nodes in lists to avoid extra spacing
+                    return output;
+                }
                 
                 // Apply formatting based on the current format context
                 let styled_text = if code_block {
