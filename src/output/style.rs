@@ -7,6 +7,7 @@ pub struct StyledText {
     style: Option<Style>,
 }
 
+#[allow(dead_code)]
 pub enum Color {
     Black,
     Red,
@@ -26,6 +27,7 @@ pub enum Color {
     BrightWhite,
 }
 
+#[allow(dead_code)]
 pub enum Style {
     Bold,
     Dim,
@@ -50,6 +52,7 @@ impl StyledText {
         self
     }
 
+    #[allow(dead_code)]
     pub fn background(mut self, color: Color) -> Self {
         self.background = Some(color);
         self
@@ -152,10 +155,12 @@ pub fn header(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
+#[allow(dead_code)]
 pub fn success(text: &str) -> StyledText {
     StyledText::new(text).foreground(Color::Green)
 }
 
+#[allow(dead_code)]
 pub fn warning(text: &str) -> StyledText {
     StyledText::new(text).foreground(Color::Yellow)
 }
@@ -179,10 +184,12 @@ pub fn print_header(text: &str) {
     println!("{}", header(text));
 }
 
+#[allow(dead_code)]
 pub fn print_success(text: &str) {
     println!("{}", success(text));
 }
 
+#[allow(dead_code)]
 pub fn print_warning(text: &str) {
     println!("{}", warning(text));
 }
@@ -195,6 +202,7 @@ pub fn print_info(text: &str) {
     println!("{}", info(text));
 }
 
+#[allow(dead_code)]
 pub fn print_highlight(text: &str) {
     println!("{}", highlight(text));
 }
