@@ -20,22 +20,36 @@ This document outlines our strategy for cleaning up the codebase according to Cl
 
 ### Pending Work - By Module
 
-### Commands Module
-- **`src/commands/dependencies.rs`**:
-  - Refactor `execute()` function into smaller single-responsibility functions
-  - Fix error variable naming (`e` → `error`)
-  - Remove duplicated error handling
-  - Improve function organization
+### Commands Module ✅
+- ✅ **`src/commands/dependencies.rs`**:
+  - ✅ Refactor `execute()` function into smaller single-responsibility functions
+  - ✅ Fix error variable naming (`e` → `error`)
+  - ✅ Remove duplicated error handling
+  - ✅ Improve function organization
 
-- **`src/commands/metrics.rs`**:
-  - Refactor `execute()` function
-  - Fix error variable naming
-  - Improve parallel processing naming and organization
+- ✅ **`src/commands/metrics.rs`**:
+  - ✅ Refactor `execute()` function
+  - ✅ Fix error variable naming
+  - ✅ Improve parallel processing naming and organization
 
-- **`src/commands/run.rs`**:
-  - Refactor to reduce complexity
-  - Streamline error handling
-  - Fix variable naming
+- ✅ **`src/commands/run.rs`**:
+  - ✅ Refactor to reduce complexity
+  - ✅ Streamline error handling
+  - ✅ Fix variable naming
+
+- ✅ **`src/commands/describe.rs`**:
+  - ✅ Refactor `execute()` function into smaller single-responsibility functions
+  - ✅ Fix error variable naming 
+  - ✅ Improve function organization
+
+- ✅ **`src/commands/style.rs`**:
+  - ✅ Refactor `execute()` function into smaller functions
+  - ✅ Fix error variable naming
+  - ✅ Improve organization and error handling
+
+- ✅ **`src/commands/mod.rs` & `src/main.rs`**:
+  - ✅ Update to handle error return codes properly
+  - ✅ Improve error propagation
 
 ### Analyzer Module
 - **`src/analyzer/file_analyzer.rs`**:
