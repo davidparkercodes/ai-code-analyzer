@@ -110,7 +110,7 @@ impl TestStruct {
     }
     
     fn display(&self) {
-        println!("TestStruct {{ field1: {}, field2: {} }}", 
+        println!("TestStruct {{ field1: {}, field2: {} }}",
                 self.field1, self.field2);
     }
 }
