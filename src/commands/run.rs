@@ -1,5 +1,4 @@
 use crate::analyzer::Analyzer;
-use crate::output::style;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 

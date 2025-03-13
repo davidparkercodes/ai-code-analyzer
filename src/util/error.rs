@@ -9,12 +9,14 @@ pub enum AppError {
     Io(#[from] io::Error),
     
     #[error("Path error: {0}")]
+    #[allow(dead_code)]
     Path(String),
     
     #[error("File system error: path {path} - {message}")]
     FileSystem { path: PathBuf, message: String },
     
     #[error("Cache error: {0}")]
+    #[allow(dead_code)]
     Cache(String),
     
     #[error("Metrics error: {0}")]
@@ -33,16 +35,19 @@ pub enum AppError {
     Description(String),
     
     #[error("Output formatting error: {0}")]
+    #[allow(dead_code)]
     Formatting(String),
     
     #[error("AI error: {0}")]
     Ai(#[from] crate::ai::AiError),
     
     #[error("Internal error: {0}")]
+    #[allow(dead_code)]
     Internal(String),
 }
 
 /// Helper function to convert a String error to AppError
+#[allow(dead_code)]
 pub fn to_app_error<E: ToString>(error: E, error_type: AppErrorType) -> AppError {
     match error_type {
         AppErrorType::Path => AppError::Path(error.to_string()),
@@ -59,6 +64,7 @@ pub fn to_app_error<E: ToString>(error: E, error_type: AppErrorType) -> AppError
 
 /// Helper enum to specify error type when converting
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum AppErrorType {
     Path,
     Cache,
