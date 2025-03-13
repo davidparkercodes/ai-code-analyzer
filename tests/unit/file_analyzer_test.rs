@@ -7,7 +7,8 @@ use tempfile::tempdir;
 fn create_test_file(dir: &Path, filename: &str, content: &str) -> std::path::PathBuf {
     let file_path = dir.join(filename);
     let mut file = File::create(&file_path).expect("Failed to create test file");
-    file.write_all(content.as_bytes()).expect("Failed to write to test file");
+    file.write_all(content.as_bytes())
+        .expect("Failed to write to test file");
     file_path
 }
 
@@ -26,20 +27,23 @@ fn main() {
     let x = 42;
 }
 "#;
-    
+
     let file_path = create_test_file(temp_dir.path(), "test.rs", rust_content);
-    
+
     let analyzer = FileAnalyzer::new();
-    let metrics = analyzer.analyze_file(file_path).expect("Failed to analyze file");
-    
-    println!("Rust file metrics: loc={}, blank={}, comments={}", 
-             metrics.lines_of_code, metrics.blank_lines, metrics.comment_lines);
-    
+    let metrics = analyzer
+        .analyze_file(file_path)
+        .expect("Failed to analyze file");
+
+    println!(
+        "Rust file metrics: loc={}, blank={}, comments={}",
+        metrics.lines_of_code, metrics.blank_lines, metrics.comment_lines
+    );
+
     assert_eq!(metrics.language, "Rust");
     assert_eq!(metrics.files, 1);
-    // Use actual implementation values
-    assert_eq!(metrics.lines_of_code, 4);  
-    assert_eq!(metrics.blank_lines, 2);    
+    assert_eq!(metrics.lines_of_code, 4);
+    assert_eq!(metrics.blank_lines, 2);
     assert_eq!(metrics.comment_lines, 5);
 }
 
@@ -58,20 +62,23 @@ def main():
     """
     x = 42
 "#;
-    
+
     let file_path = create_test_file(temp_dir.path(), "test.py", python_content);
-    
+
     let analyzer = FileAnalyzer::new();
-    let metrics = analyzer.analyze_file(file_path).expect("Failed to analyze file");
-    
-    println!("Python file metrics: loc={}, blank={}, comments={}", 
-             metrics.lines_of_code, metrics.blank_lines, metrics.comment_lines);
-    
+    let metrics = analyzer
+        .analyze_file(file_path)
+        .expect("Failed to analyze file");
+
+    println!(
+        "Python file metrics: loc={}, blank={}, comments={}",
+        metrics.lines_of_code, metrics.blank_lines, metrics.comment_lines
+    );
+
     assert_eq!(metrics.language, "Python");
     assert_eq!(metrics.files, 1);
-    // Use actual implementation values
-    assert_eq!(metrics.lines_of_code, 5);  
-    assert_eq!(metrics.blank_lines, 2);    
+    assert_eq!(metrics.lines_of_code, 5);
+    assert_eq!(metrics.blank_lines, 2);
     assert_eq!(metrics.comment_lines, 4);
 }
 
@@ -79,6 +86,6 @@ def main():
 fn test_analyze_nonexistent_file() {
     let analyzer = FileAnalyzer::new();
     let metrics = analyzer.analyze_file("nonexistent_file.rs");
-    
+
     assert!(metrics.is_none());
 }

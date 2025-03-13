@@ -7,6 +7,12 @@ pub struct FileAnalyzer {
     language_detector: LanguageDetector,
 }
 
+impl Default for FileAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FileAnalyzer {
     pub fn new() -> Self {
         FileAnalyzer {
