@@ -42,6 +42,7 @@ struct OpenAiResponseMessage {
 
 impl OpenAiProvider {
     /// Create a new OpenAI provider with the given configuration and model tier
+    #[allow(unused)]
     pub fn new(config: AiConfig, model_tier: ModelTier) -> Result<Self, AiError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(120))

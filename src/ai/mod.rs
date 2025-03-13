@@ -5,7 +5,6 @@ pub mod mistral;
 pub mod factory;
 
 pub use config::AiConfig;
-pub use factory::create_ai_model;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -80,26 +79,27 @@ pub enum AiError {
     
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
-    
-    #[error("Unknown error: {0}")]
-    Unknown(String),
 }
 
 /// Trait defining the common interface for all AI models
 #[async_trait]
 pub trait AiModel: Send + Sync {
     /// Returns the name of this vendor
+    #[allow(unused)]
     fn vendor_name(&self) -> &'static str;
     
     /// Returns the currently active model name
+    #[allow(unused)]
     fn model_name(&self) -> String;
     
     /// Generate a text response from the AI model
     async fn generate_response(&self, prompt: &str) -> Result<String, AiError>;
     
     /// Generate code from the AI model
+    #[allow(unused)]
     async fn generate_code(&self, prompt: &str, language: Option<&str>) -> Result<String, AiError>;
     
     /// Analyze code with the AI model
+    #[allow(unused)]
     async fn analyze_code(&self, code: &str, prompt: Option<&str>) -> Result<String, AiError>;
 }

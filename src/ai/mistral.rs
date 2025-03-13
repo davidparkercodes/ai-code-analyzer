@@ -42,6 +42,7 @@ struct MistralResponseMessage {
 
 impl MistralProvider {
     /// Create a new Mistral provider with the given configuration and model tier
+    #[allow(unused)]
     pub fn new(config: AiConfig, model_tier: ModelTier) -> Result<Self, AiError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(120))
