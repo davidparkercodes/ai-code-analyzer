@@ -77,7 +77,7 @@ impl StyledText {
         self.style = Some(style);
         self
     }
-    
+
     // Remove to_string method as it shadows Display implementation
 }
 
@@ -86,15 +86,15 @@ impl fmt::Display for StyledText {
         let mut codes = Vec::new();
 
         if let Some(style) = &self.style {
-            codes.push(style.to_ansi_code());
+            codes.push(style.get_ansi_code());
         }
 
         if let Some(color) = &self.foreground {
-            codes.push(color.to_foreground_ansi_code());
+            codes.push(color.get_foreground_ansi_code());
         }
 
         if let Some(color) = &self.background {
-            codes.push(color.to_background_ansi_code());
+            codes.push(color.get_background_ansi_code());
         }
 
         if codes.is_empty() {
@@ -106,7 +106,7 @@ impl fmt::Display for StyledText {
 }
 
 impl Color {
-    fn to_foreground_ansi_code(&self) -> String {
+    fn get_foreground_ansi_code(&self) -> String {
         (match self {
             Color::Black => 30,
             Color::Red => 31,
@@ -128,7 +128,7 @@ impl Color {
         .to_string()
     }
 
-    fn to_background_ansi_code(&self) -> String {
+    fn get_background_ansi_code(&self) -> String {
         (match self {
             Color::Black => 40,
             Color::Red => 41,
@@ -152,7 +152,7 @@ impl Color {
 }
 
 impl Style {
-    fn to_ansi_code(&self) -> String {
+    fn get_ansi_code(&self) -> String {
         (match self {
             Style::Bold => 1,
             Style::Dim => 2,

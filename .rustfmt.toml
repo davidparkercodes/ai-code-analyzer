@@ -1,0 +1,10 @@
+# Rust Formatter Config for code-analyzer (stable features only)
+
+# Use 4 spaces for indentation (Rust standard)
+tab_spaces = 4
+
+# Maximum width of each line
+max_width = 100
+
+# Reorder imports alphabetically
+reorder_imports = true
