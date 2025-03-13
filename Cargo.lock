@@ -365,6 +365,7 @@ dependencies = [
  "ignore",
  "predicates",
  "rayon",
+ "regex",
  "tempfile",
  "walkdir",
 ]

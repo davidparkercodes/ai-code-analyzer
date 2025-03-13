@@ -3,6 +3,7 @@ mod cache;
 mod dependency;
 mod metrics;
 mod output;
+mod style_analyzer;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -44,6 +45,20 @@ enum Commands {
         path: String,
         
         /// Output path for the DOT graph file (optional)
+        #[arg(short, long)]
+        output: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+    },
+    /// Analyze code style patterns and generate a style guide
+    Style {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Output path for the style guide markdown file (optional)
         #[arg(short, long)]
         output: Option<String>,
         
@@ -113,6 +128,46 @@ fn main() {
                 }
                 Err(e) => {
                     output::style::print_error(&format!("Error analyzing dependencies: {}", e));
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::Style { path, output, no_parallel } => {
+            let analyzer = style_analyzer::StyleAnalyzer::new();
+            
+            if !no_parallel {
+                output::style::print_info("Parallel processing: enabled");
+            }
+            
+            output::style::print_header("Analyzing Code Style");
+            output::style::print_info(&format!("Analyzing directory: {}", path));
+            
+            let start_time = std::time::Instant::now();
+            match analyzer.analyze_codebase(path) {
+                Ok(report) => {
+                    let elapsed = start_time.elapsed();
+                    
+                    // Print the report to console
+                    println!("{}", report);
+                    output::style::print_success(&format!("Style analysis completed in {:.2?}", elapsed));
+                    
+                    // Export the style guide if requested
+                    if let Some(output_path) = output {
+                        if let Some(style_guide) = report.get_style_guide() {
+                            match std::fs::write(output_path, style_guide) {
+                                Ok(_) => {
+                                    output::style::print_success(&format!("Style guide exported to {}", output_path));
+                                }
+                                Err(e) => {
+                                    output::style::print_error(&format!("Error writing style guide: {}", e));
+                                    process::exit(1);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    output::style::print_error(&format!("Error analyzing code style: {}", e));
                     process::exit(1);
                 }
             }
