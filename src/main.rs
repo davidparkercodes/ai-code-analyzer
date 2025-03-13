@@ -1,6 +1,8 @@
+mod analyzer;
+mod metrics;
+
 use clap::{Parser, Subcommand};
-use std::path::Path;
-use walkdir::WalkDir;
+use std::process;
 
 #[derive(Parser)]
 #[command(name = "codeanalyzer")]
@@ -12,8 +14,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run the code analyzer on the current directory
+    /// Run the code analyzer on the specified directory
     Run {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+    },
+    /// Generate only code metrics for the specified directory
+    Metrics {
         /// Path to analyze (defaults to current directory)
         #[arg(default_value = ".")]
         path: String,
@@ -25,30 +33,19 @@ fn main() {
 
     match &cli.command {
         Commands::Run { path } => {
-            println!("Analyzing directory: {}", path);
-            list_files_and_directories(path);
+            let mut analyzer = analyzer::Analyzer::new();
+            if let Err(e) = analyzer.analyze(path) {
+                eprintln!("Error analyzing directory: {}", e);
+                process::exit(1);
+            }
+        },
+        Commands::Metrics { path } => {
+            let mut metrics = metrics::CodeMetrics::new();
+            if let Err(e) = metrics.analyze_directory(path) {
+                eprintln!("Error analyzing directory: {}", e);
+                process::exit(1);
+            }
+            metrics.print_summary();
         }
-    }
-}
-
-fn list_files_and_directories(dir_path: &str) {
-    let path = Path::new(dir_path);
-    
-    if !path.exists() {
-        println!("Error: Path '{}' does not exist", dir_path);
-        return;
-    }
-
-    println!("\nFiles and directories:");
-    println!("----------------------");
-    
-    for entry in WalkDir::new(path).max_depth(1).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.to_string_lossy() == dir_path {
-            continue;
-        }
-        
-        let file_type = if path.is_dir() { "Directory" } else { "File" };
-        println!("{}: {}", file_type, path.display());
     }
 }
