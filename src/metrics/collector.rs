@@ -1,7 +1,7 @@
 use crate::analyzer::file_analyzer::FileAnalyzer;
 use crate::metrics::models::CodeMetrics;
+use ignore::WalkBuilder;
 use std::path::Path;
-use walkdir::WalkDir;
 
 pub struct MetricsCollector {
     file_analyzer: FileAnalyzer,
@@ -26,8 +26,25 @@ impl MetricsCollector {
         }
 
         let mut metrics = CodeMetrics::new();
+        
+        // Build a walker that respects .gitignore
+        let walker = WalkBuilder::new(path)
+            .hidden(false) // Process hidden files, but still respect .gitignore
+            .git_ignore(true) // Use .gitignore files
+            .git_global(true) // Use global gitignore
+            .git_exclude(true) // Use git exclude files
+            .build();
 
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        for result in walker {
+            let entry = match result {
+                Ok(entry) => entry,
+                Err(err) => {
+                    // Skip entries we can't access with a warning in debug
+                    crate::output::style::print_warning(&format!("Warning: {}", err));
+                    continue;
+                }
+            };
+
             let path = entry.path();
 
             if path.is_dir() {
