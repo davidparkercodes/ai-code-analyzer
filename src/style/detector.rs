@@ -272,6 +272,7 @@ impl StyleDetector {
             // 2. Part of a continued expression (ending with operators like ||, &&, +, etc.)
             // 3. Continuation of a chain/fluent API (.method().method())
             // 4. Just closing parentheses, braces, or brackets
+            // Check if this line is part of a continuation or a method chain
             let is_continuation_line = i > 0 && {
                 let prev_trimmed = lines[i-1].trim();
                 prev_trimmed.ends_with('+') || 
@@ -284,6 +285,7 @@ impl StyleDetector {
                 prev_trimmed.ends_with('.')
             };
             
+            // Check if this line starts with a continuation character
             let starts_with_continuation = 
                 trimmed.starts_with('.') || 
                 trimmed.starts_with(')') || 
@@ -291,6 +293,17 @@ impl StyleDetector {
                 trimmed.starts_with(']') || 
                 trimmed.starts_with("||") || 
                 trimmed.starts_with("&&");
+            
+            // Check if this line is a parameter in a method call or function call
+            let is_parameter_line = 
+                // Lines that are string literals, numbers, or identifiers often followed by commas
+                (trimmed.starts_with('"') || 
+                 trimmed.chars().next().is_some_and(|c| c.is_ascii_digit()) ||
+                 trimmed.chars().next().is_some_and(|c| c.is_alphabetic())) &&
+                (trimmed.ends_with(',') || trimmed.ends_with(')')) &&
+                i > 0 && i < lines.len() - 1 &&
+                // Previous line has a function call or method invocation pattern
+                (lines[i-1].contains('(') || lines[i-1].trim().ends_with(','));
             let is_trivial = trimmed.len() <= 3 || trimmed.matches(|c| c != '}' && c != '{' && c != ')' && c != ']').count() <= 2;
             
             if !trimmed.is_empty() && 
@@ -298,6 +311,7 @@ impl StyleDetector {
                !is_trivial &&
                !is_continuation_line && 
                !starts_with_continuation && 
+               !is_parameter_line &&
                !trimmed.ends_with("||") && 
                !trimmed.ends_with("&&") {
                 
