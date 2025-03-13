@@ -396,12 +396,12 @@ fn display_clean_results(stats: &CleanStats, start_time: Instant) {
 }
 
 /// Process a line of code, preserving string literals while removing comments outside them
-fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
+fn process_line_preserving_strings(line: &str, _comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
     // State tracking for string parsing
     let mut in_string = false;
     let mut in_raw_string = false;
     let mut escape_next = false;
-    let mut chars = line.chars().collect::<Vec<_>>();
+    let chars = line.chars().collect::<Vec<_>>();
     let length = chars.len();
     
     // Find potential comment positions that are outside string literals
