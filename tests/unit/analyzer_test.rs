@@ -7,7 +7,7 @@ use tempfile::tempdir;
 fn setup_test_directory(dir: &Path) {
     // Create a simple directory structure with some files
     fs::create_dir_all(dir.join("src")).expect("Failed to create subdirectory");
-    
+
     // Create a Rust file
     let rust_content = r#"
 // test.rs file
@@ -16,7 +16,8 @@ fn main() {
 }
 "#;
     let mut file = File::create(dir.join("src/test.rs")).expect("Failed to create file");
-    file.write_all(rust_content.as_bytes()).expect("Failed to write to file");
+    file.write_all(rust_content.as_bytes())
+        .expect("Failed to write to file");
 }
 
 #[test]
@@ -29,10 +30,10 @@ fn test_analyzer_new() {
 fn test_analyzer_analyze() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
     setup_test_directory(temp_dir.path());
-    
+
     let mut analyzer = Analyzer::new();
     let result = analyzer.analyze(temp_dir.path());
-    
+
     assert!(result.is_ok());
 }
 
@@ -40,6 +41,6 @@ fn test_analyzer_analyze() {
 fn test_analyzer_analyze_nonexistent_directory() {
     let mut analyzer = Analyzer::new();
     let result = analyzer.analyze("/nonexistent/directory");
-    
+
     assert!(result.is_err());
 }
