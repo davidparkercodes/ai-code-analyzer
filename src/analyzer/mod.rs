@@ -23,6 +23,8 @@ impl Default for Analyzer {
     }
 }
 
+use crate::util::parallel::ParallelProcessing;
+
 impl Analyzer {
     pub fn new() -> Self {
         let cache = Arc::new(AnalysisCache::new());
@@ -37,12 +39,20 @@ impl Analyzer {
             parallel: true,
         }
     }
-    
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
+}
+
+impl ParallelProcessing for Analyzer {
+    fn with_parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
     }
+    
+    fn is_parallel(&self) -> bool {
+        self.parallel
+    }
+}
 
+impl Analyzer {
     pub fn analyze<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         print_info(&format!("Analyzing directory: {}", path.as_ref().display()));
         print_info(&format!("Parallel processing: {}", if self.parallel { "enabled" } else { "disabled" }));

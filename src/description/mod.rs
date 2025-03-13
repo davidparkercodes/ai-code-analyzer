@@ -10,6 +10,7 @@ use crate::ai::{AiConfig, ModelTier, factory};
 use crate::cache::AnalysisCache;
 use crate::metrics::language::LanguageDetector;
 use crate::output::style;
+use crate::util::parallel::ParallelProcessing;
 
 // Number of files to include in each batch for initial summarization
 const BATCH_SIZE: usize = 10;
@@ -37,13 +38,18 @@ pub struct CodeDescriptor {
     parallel: bool,
 }
 
-impl CodeDescriptor {
-    /// Returns whether parallel processing is enabled
-    #[allow(dead_code)]
-    pub fn is_parallel(&self) -> bool {
-        self.parallel
+impl ParallelProcessing for CodeDescriptor {
+    fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
     }
     
+    fn is_parallel(&self) -> bool {
+        self.parallel
+    }
+}
+
+impl CodeDescriptor {
     /// Create a new CodeDescriptor
     pub fn new(ai_config: AiConfig) -> Self {
         CodeDescriptor {
@@ -52,12 +58,6 @@ impl CodeDescriptor {
             ai_config,
             parallel: true,
         }
-    }
-    
-    /// Set the parallel processing flag
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
-        self
     }
     
     /// Describe a codebase using AI

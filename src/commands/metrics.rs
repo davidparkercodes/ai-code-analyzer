@@ -1,7 +1,7 @@
 use crate::metrics::collector::MetricsCollector;
 use crate::metrics::reporter::MetricsReporter;
 use crate::output::style;
-use crate::util::parallel::{log_parallel_status, parse_parallel_flag};
+use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 
 pub fn execute(path: String, no_parallel: bool) {
     let is_parallel = parse_parallel_flag(no_parallel);

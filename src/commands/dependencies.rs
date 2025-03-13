@@ -1,7 +1,7 @@
 use crate::dependency::dependency_analyzer::DependencyAnalyzer;
 use crate::dependency::dependency_reporter::DependencyReporter;
 use crate::output::style;
-use crate::util::parallel::{log_parallel_status, parse_parallel_flag};
+use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
 
 pub fn execute(path: String, output: Option<String>, no_parallel: bool) {

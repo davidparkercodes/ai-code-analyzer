@@ -18,6 +18,8 @@ impl Default for MetricsCollector {
     }
 }
 
+use crate::util::parallel::ParallelProcessing;
+
 impl MetricsCollector {
     pub fn new() -> Self {
         let cache = Arc::new(AnalysisCache::new());
@@ -27,12 +29,20 @@ impl MetricsCollector {
             parallel: true,
         }
     }
-    
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
+}
+
+impl ParallelProcessing for MetricsCollector {
+    fn with_parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
     }
+    
+    fn is_parallel(&self) -> bool {
+        self.parallel
+    }
+}
 
+impl MetricsCollector {
     pub fn collect_metrics<P: AsRef<Path>>(&self, dir_path: P) -> Result<CodeMetrics, String> {
         let path = dir_path.as_ref();
 

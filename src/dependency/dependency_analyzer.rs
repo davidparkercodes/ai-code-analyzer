@@ -1,6 +1,7 @@
 use crate::cache::AnalysisCache;
 use crate::dependency::dependency_graph::DependencyGraph;
 use crate::metrics::language::LanguageDetector;
+use crate::util::parallel::ParallelProcessing;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -18,6 +19,17 @@ pub struct DependencyAnalyzer {
 impl Default for DependencyAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ParallelProcessing for DependencyAnalyzer {
+    fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
+    }
+    
+    fn is_parallel(&self) -> bool {
+        self.parallel
     }
 }
 
@@ -57,11 +69,6 @@ impl DependencyAnalyzer {
         let mut analyzer = Self::new();
         analyzer.cache = cache;
         analyzer
-    }
-    
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
-        self
     }
     
     pub fn analyze_dependencies<P: AsRef<Path>>(&self, dir_path: P) -> Result<DependencyGraph, String> {

@@ -2,7 +2,7 @@ use crate::description::CodeDescriptor;
 use crate::output::style;
 use crate::output::markdown::render_markdown;
 use crate::ai::AiConfig;
-use crate::util::parallel::{log_parallel_status, parse_parallel_flag};
+use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
 
 pub async fn execute(path: String, output: Option<String>, no_parallel: bool) {
