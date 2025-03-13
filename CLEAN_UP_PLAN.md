@@ -51,14 +51,24 @@ This document outlines our strategy for cleaning up the codebase according to Cl
   - ✅ Update to handle error return codes properly
   - ✅ Improve error propagation
 
-### Analyzer Module
-- **`src/analyzer/file_analyzer.rs`**:
-  - Break down `analyze_file` method (75+ lines) into:
-    - `detect_file_language`
-    - `count_metrics`
-    - `check_test_file`
-  - Fix any naming issues 
-  - Remove any remaining unnecessary comments
+### Analyzer Module ✅
+- ✅ **`src/analyzer/file_analyzer.rs`**:
+  - ✅ Break down `analyze_file` method (75+ lines) into:
+    - ✅ `get_cached_metrics`
+    - ✅ `detect_file_language`
+    - ✅ `get_file_content`
+    - ✅ `check_if_test_file`
+    - ✅ `cache_file_metrics`
+  - ✅ Fix naming issues (loc → lines_of_code, blank → blank_lines, comments → comment_lines)
+  - ✅ Removed unnecessary comments
+
+- ✅ **`src/analyzer/mod.rs`**:
+  - ✅ Break down `analyze` method into:
+    - ✅ `print_analysis_header`
+    - ✅ `perform_metrics_analysis`
+    - ✅ `perform_dependency_analysis`
+    - ✅ `print_total_analysis_time`
+  - ✅ Fix error variable naming (e → error)
 
 ### Metrics Module
 - **`src/metrics/collector.rs`**:
