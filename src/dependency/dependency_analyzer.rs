@@ -67,10 +67,29 @@ impl DependencyAnalyzer {
             .filter_entry(|e| {
                 let path_str = e.path().to_string_lossy();
                 let file_name = e.path().file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-                !path_str.contains("/.git/") && 
-                !path_str.ends_with(".lock") && 
-                !path_str.ends_with(".gitignore") &&
-                file_name != ".DS_Store"
+                // Exclude git files, lock files, config files, and system files
+                let is_excluded_system_file = path_str.contains("/.git/") || 
+                    path_str.ends_with(".lock") || 
+                    path_str.ends_with(".gitignore") ||
+                    file_name == ".DS_Store";
+                
+                // Exclude test files and directories
+                let is_test_file = path_str.contains("/test") || 
+                    path_str.contains("/tests/") || 
+                    path_str.contains("_test.") || 
+                    path_str.ends_with("_test.rs") ||
+                    path_str.ends_with("_tests.rs") ||
+                    path_str.ends_with("Test.java") ||
+                    path_str.ends_with(".test.js") ||
+                    path_str.ends_with(".test.ts") ||
+                    path_str.ends_with("_spec.js") ||
+                    path_str.ends_with("_spec.ts") ||
+                    path_str.ends_with("_test.py") ||
+                    path_str.ends_with("test_") ||
+                    file_name == "test";
+                
+                // Include only if not excluded
+                !is_excluded_system_file && !is_test_file
             })
             .build();
         

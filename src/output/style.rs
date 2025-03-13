@@ -8,6 +8,7 @@ pub struct StyledText {
 }
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum Color {
     Black,
     Red,
@@ -28,6 +29,7 @@ pub enum Color {
 }
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum Style {
     Bold,
     Dim,
