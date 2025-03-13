@@ -80,3 +80,36 @@ dependencies = [
     "test",
     "build-release-all"
 ]
+
+[tasks.build-install-mac]
+description = "Build and install codeanalyzer to /usr/local/bin on macOS"
+condition = { platforms = ["mac"] }
+dependencies = ["build-release-macos"]
+script = '''
+#!/usr/bin/env bash
+echo "Installing codeanalyzer to /usr/local/bin..."
+if [ -f "target/release/codeanalyzer" ]; then
+    # Check if /usr/local/bin exists and is writable, or use sudo
+    if [ -w "/usr/local/bin" ]; then
+        cp target/release/codeanalyzer /usr/local/bin/
+    else
+        echo "Need administrator privileges to copy to /usr/local/bin"
+        sudo cp target/release/codeanalyzer /usr/local/bin/
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo "Installation successful! You can now use 'codeanalyzer' command from anywhere."
+        # Check if /usr/local/bin is in PATH
+        if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
+            echo "Warning: /usr/local/bin is not in your PATH. You may need to add it."
+            echo "Add the following line to your ~/.bash_profile or ~/.zshrc:"
+            echo 'export PATH="/usr/local/bin:$PATH"'
+        fi
+    else
+        echo "Installation failed."
+    fi
+else
+    echo "Error: Build file not found. Build may have failed."
+    exit 1
+fi
+'''
