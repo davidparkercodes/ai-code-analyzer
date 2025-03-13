@@ -13,7 +13,6 @@ use crate::output::style;
 use crate::util::error::{AppError, AppResult};
 use crate::util::file_filter::FileFilter;
 use crate::util::parallel::ParallelProcessing;
-use std::sync::Arc;
 
 const BATCH_SIZE: usize = 10;
 
