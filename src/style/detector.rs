@@ -251,7 +251,10 @@ impl StyleDetector {
         let mut lines_with_tabs = Vec::new();
         let mut indentation_by_line = HashMap::new();
         
-        for (i, line) in content.lines().enumerate() {
+        // Get all lines first for easier context checking
+        let lines: Vec<&str> = content.lines().collect();
+
+        for (i, line) in lines.iter().enumerate() {
             let line_number = i + 1;
             
             if line.trim().is_empty() {
@@ -263,7 +266,41 @@ impl StyleDetector {
             // Only consider lines that would reveal indentation - typically those with a non-trivial amount of code
             // and that start with whitespace
             let trimmed = line.trim();
-            if !trimmed.is_empty() && trimmed.len() < line.len() && trimmed.len() > 3 {
+            
+            // Skip lines that are:
+            // 1. Empty or have minimal content
+            // 2. Part of a continued expression (ending with operators like ||, &&, +, etc.)
+            // 3. Continuation of a chain/fluent API (.method().method())
+            // 4. Just closing parentheses, braces, or brackets
+            let is_continuation_line = i > 0 && {
+                let prev_trimmed = lines[i-1].trim();
+                prev_trimmed.ends_with('+') || 
+                prev_trimmed.ends_with('-') || 
+                prev_trimmed.ends_with('*') || 
+                prev_trimmed.ends_with('/') || 
+                prev_trimmed.ends_with('|') || 
+                prev_trimmed.ends_with('&') || 
+                prev_trimmed.ends_with(',') || 
+                prev_trimmed.ends_with('.')
+            };
+            
+            let starts_with_continuation = 
+                trimmed.starts_with('.') || 
+                trimmed.starts_with(')') || 
+                trimmed.starts_with('}') || 
+                trimmed.starts_with(']') || 
+                trimmed.starts_with("||") || 
+                trimmed.starts_with("&&");
+            let is_trivial = trimmed.len() <= 3 || trimmed.matches(|c| c != '}' && c != '{' && c != ')' && c != ']').count() <= 2;
+            
+            if !trimmed.is_empty() && 
+               trimmed.len() < line.len() && 
+               !is_trivial &&
+               !is_continuation_line && 
+               !starts_with_continuation && 
+               !trimmed.ends_with("||") && 
+               !trimmed.ends_with("&&") {
+                
                 if line.starts_with('\t') {
                     has_tabs = true;
                     lines_with_tabs.push(line_number);
