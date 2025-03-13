@@ -31,42 +31,7 @@ impl StyleReport {
     // These methods are removed as they're currently unused
     // If needed in the future, uncomment and implement
 
-    pub fn get_dominant_patterns(&self) -> Vec<&StylePattern> {
-        let mut result = Vec::new();
-        let mut rule_map: HashMap<String, Vec<&StylePattern>> = HashMap::new();
-
-        // Group patterns by rule type and language
-        for pattern in &self.patterns {
-            // Special handling for unrealistic line length patterns (too short to be real)
-            if let StyleRule::MaxLineLength(length) = pattern.rule {
-                if length < 20 {
-                    // Skip very short line length patterns as they're likely noise
-                    continue;
-                }
-            }
-            
-            let rule_key = format!(
-                "{:?}_{}",
-                pattern.rule,
-                pattern.language
-            );
-            rule_map.entry(rule_key).or_default().push(pattern);
-        }
-
-        // For each rule type, select the pattern with highest consistency
-        for patterns in rule_map.values() {
-            if let Some(dominant) = patterns.iter().max_by(|a, b| {
-                a.consistency.partial_cmp(&b.consistency).unwrap()
-            }) {
-                if dominant.consistency >= 0.7 {
-                    // Only include patterns with at least 70% consistency
-                    result.push(*dominant);
-                }
-            }
-        }
-
-        result
-    }
+    // Removed unused method that was causing dead code warning
 
     pub fn generate_style_guide(&mut self) {
         let mut guide = String::new();
@@ -305,23 +270,35 @@ impl fmt::Display for StyleReport {
         for (language, patterns) in &lang_patterns {
             writeln!(f, "\n{} Metrics:", language)?;
             
-            // Line length metrics
-            let line_length_patterns: Vec<_> = patterns.iter()
-                .filter(|p| matches!(p.rule, StyleRule::MaxLineLength(_) | StyleRule::AvgLineLength(_)))
-                .collect();
-                
-            if !line_length_patterns.is_empty() {
-                for pattern in line_length_patterns {
-                    match &pattern.rule {
-                        StyleRule::MaxLineLength(length) => {
-                            writeln!(f, "  Max Line Length: {} chars", length)?;
+            // Line length metrics - show only max and average
+            let mut max_length = 0;
+            let mut total_avg_length = 0;
+            let mut avg_count = 0;
+            
+            // Find the maximum line length and average the avg line lengths
+            for pattern in patterns.iter() {
+                match &pattern.rule {
+                    StyleRule::MaxLineLength(length) => {
+                        if *length > max_length {
+                            max_length = *length;
                         }
-                        StyleRule::AvgLineLength(length) => {
-                            writeln!(f, "  Avg Line Length: {} chars", length)?;
-                        }
-                        _ => {}
                     }
+                    StyleRule::AvgLineLength(length) => {
+                        total_avg_length += *length;
+                        avg_count += 1;
+                    }
+                    _ => {}
                 }
+            }
+            
+            // Display aggregated metrics
+            if max_length > 0 {
+                writeln!(f, "  Max Line Length: {} chars", max_length)?;
+            }
+            
+            if avg_count > 0 {
+                let avg_length = total_avg_length / avg_count;
+                writeln!(f, "  Avg Line Length: {} chars", avg_length)?;
             }
             
             // Indentation
