@@ -113,7 +113,9 @@ impl DependencyGraph {
     
     pub fn to_dot_format(&self) -> String {
         let mut result = String::from("digraph DependencyGraph {\n");
-        result.push_str("  node [shape=box, style=filled, fillcolor=lightblue];\n");
+        result.push_str("  node [shape=box, style=filled, fillcolor=lightcyan];\n");
+        result.push_str("  edge [color=darkslategray];\n");
+        result.push_str("  graph [bgcolor=white];\n");
         
         for node in &self.nodes {
             let node_id = node.replace(&['/', '.', '-', ' '][..], "_");
