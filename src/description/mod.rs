@@ -80,7 +80,7 @@ impl CodeDescriptor {
         style::print_info("🔎 Scanning codebase files...");
         
         // Collect and process files
-        let batches = self.collect_files_internal(path)?;
+        let batches = self.build_file_batches(path)?;
         style::print_info(&format!("📦 Collected {} file batches for analysis", batches.len()));
         
         // Generate batch summaries using low-tier model
@@ -99,16 +99,11 @@ impl CodeDescriptor {
     /// Exposed for file collection operation
     #[allow(dead_code)]
     pub fn collect_files<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
-        self.collect_files_internal(dir_path)
+        self.build_file_batches(dir_path)
     }
 
-    // Internal implementation for file collection
-    fn collect_files_internal<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
-        self.collect_files_impl(dir_path)
-    }
-
-    // Actual implementation
-    fn collect_files_impl<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
+    // Main file collection implementation
+    fn build_file_batches<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
         let path = dir_path.as_ref();
         
         // Create walker that respects .gitignore
