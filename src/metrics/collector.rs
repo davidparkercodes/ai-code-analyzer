@@ -1,6 +1,7 @@
 use crate::analyzer::file_analyzer::FileAnalyzer;
 use crate::cache::AnalysisCache;
 use crate::metrics::models::CodeMetrics;
+use crate::util::file_filter::FileFilter;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 use std::path::Path;
@@ -89,12 +90,7 @@ impl MetricsCollector {
             .git_global(true)
             .git_exclude(true)
             .filter_entry(|e| {
-                let path_str = e.path().to_string_lossy();
-                let file_name = e.path().file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-                !path_str.contains("/.git/") && 
-                !path_str.ends_with(".lock") && 
-                !path_str.ends_with(".gitignore") &&
-                file_name != ".DS_Store"
+                !FileFilter::should_exclude(e.path())
             })
             .build();
             

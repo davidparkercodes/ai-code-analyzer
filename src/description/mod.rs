@@ -11,6 +11,7 @@ use crate::cache::AnalysisCache;
 use crate::metrics::language::LanguageDetector;
 use crate::output::style;
 use crate::util::error::{AppError, AppResult};
+use crate::util::file_filter::FileFilter;
 use crate::util::parallel::ParallelProcessing;
 
 const BATCH_SIZE: usize = 10;
@@ -117,22 +118,7 @@ impl CodeDescriptor {
             .git_global(true)
             .git_exclude(true)
             .filter_entry(|e| {
-                let path_str = e.path().to_string_lossy();
-                let file_name = e.path().file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-                !path_str.contains("/.git/") && 
-                !path_str.ends_with(".lock") && 
-                !path_str.ends_with(".gitignore") &&
-                !path_str.ends_with(".png") &&
-                !path_str.ends_with(".jpg") &&
-                !path_str.ends_with(".jpeg") &&
-                !path_str.ends_with(".gif") &&
-                !path_str.ends_with(".svg") &&
-                !path_str.ends_with(".woff") &&
-                !path_str.ends_with(".woff2") &&
-                !path_str.ends_with(".ttf") &&
-                !path_str.ends_with(".eot") &&
-                !path_str.ends_with(".ico") &&
-                file_name != ".DS_Store"
+                !FileFilter::should_exclude(e.path())
             })
             .build();
         
