@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::style_analyzer::pattern::{
-    IndentationStyle, NamingConvention, StylePattern, StyleRule,
+    IndentationStyle, StylePattern, StyleRule,
 };
 
 pub struct StyleReport {
@@ -159,47 +159,7 @@ impl StyleReport {
                     }
                 }
                 
-                // Naming conventions
-                if let Some(pattern) = patterns.iter().find(|p| {
-                    matches!(p.rule, StyleRule::NamingConvention(_))
-                }) {
-                    guide.push_str("### Naming Conventions\n\n");
-                    
-                    match &pattern.rule {
-                        StyleRule::NamingConvention(convention) => {
-                            match convention {
-                                NamingConvention::CamelCase => {
-                                    guide.push_str(&format!("- **camelCase** naming convention detected ({}% of identifiers)\n", 
-                                        (pattern.consistency * 100.0) as usize));
-                                }
-                                NamingConvention::PascalCase => {
-                                    guide.push_str(&format!("- **PascalCase** naming convention detected ({}% of identifiers)\n", 
-                                        (pattern.consistency * 100.0) as usize));
-                                }
-                                NamingConvention::SnakeCase => {
-                                    guide.push_str(&format!("- **snake_case** naming convention detected ({}% of identifiers)\n", 
-                                        (pattern.consistency * 100.0) as usize));
-                                }
-                                NamingConvention::ScreamingSnakeCase => {
-                                    guide.push_str(&format!("- **SCREAMING_SNAKE_CASE** naming convention detected ({}% of identifiers)\n", 
-                                        (pattern.consistency * 100.0) as usize));
-                                }
-                                NamingConvention::Mixed => {
-                                    guide.push_str("- **Mixed naming conventions** detected in the codebase\n");
-                                    
-                                    if !pattern.examples.is_empty() {
-                                        guide.push_str("\nExamples of identifiers:\n\n");
-                                        for example in &pattern.examples {
-                                            guide.push_str(&format!("- `{}`\n", example));
-                                        }
-                                    }
-                                }
-                            }
-                            guide.push_str("\n");
-                        }
-                        _ => {}
-                    }
-                }
+                // Naming conventions section removed as it needs more refined analysis by identifier type
             
                 // Function size
                 if let Some(pattern) = patterns.iter().find(|p| {
@@ -248,7 +208,7 @@ impl StyleReport {
         guide.push_str("- Indentation: Consistent indentation improves readability\n");
         guide.push_str("- Function size: Smaller functions (under 20-30 lines) are generally more maintainable\n");
         guide.push_str("- Comment density: Aim for self-documenting code with targeted comments for complex logic\n");
-        guide.push_str("- Naming conventions: Consistent naming styles improve code readability\n");
+        // Removed naming conventions insight as we're not analyzing them in detail yet
         
         self.style_guide = Some(guide);
     }
@@ -377,16 +337,7 @@ impl fmt::Display for StyleReport {
                     }
                 }
                 
-                // Naming conventions
-                if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::NamingConvention(_))) {
-                    match &pattern.rule {
-                        StyleRule::NamingConvention(convention) => {
-                            writeln!(f, "  Naming Convention: {:?} ({}% consistent)", 
-                                convention, (pattern.consistency * 100.0) as usize)?;
-                        }
-                        _ => {}
-                    }
-                }
+                // Naming conventions section removed as it needs more refined analysis by identifier type
             }
         }
         
