@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 
-use crate::ai::{AiConfig, ModelTier, factory};
+use crate::ai::{AiConfig, ModelTier, factory, AiModel, AiError};
 use crate::cache::AnalysisCache;
 use crate::metrics::language::LanguageDetector;
 use crate::output::style;
+use crate::util::error::{AppError, AppResult};
 use crate::util::parallel::ParallelProcessing;
 
 const BATCH_SIZE: usize = 10;
@@ -64,15 +65,15 @@ impl CodeDescriptor {
     }
     
     /// Describe a codebase using AI
-    pub async fn describe_codebase<P: AsRef<Path>>(&self, dir_path: P) -> Result<String, String> {
+    pub async fn describe_codebase<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<String> {
         let path = dir_path.as_ref();
         
         if !path.exists() {
-            return Err(format!("Path '{}' does not exist", path.display()));
+            return Err(AppError::Description(format!("Path '{}' does not exist", path.display())));
         }
 
         if !path.is_dir() {
-            return Err(format!("Path '{}' is not a directory", path.display()));
+            return Err(AppError::Description(format!("Path '{}' is not a directory", path.display())));
         }
         
         style::print_info("🔎 Scanning codebase files...");
@@ -96,17 +97,17 @@ impl CodeDescriptor {
     
     /// Exposed for file collection operation
     #[allow(dead_code)]
-    pub fn collect_files<P: AsRef<Path>>(&self, dir_path: P) -> Result<Vec<FileBatch>, String> {
+    pub fn collect_files<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
         self.collect_files_internal(dir_path)
     }
 
     // Internal implementation for file collection
-    fn collect_files_internal<P: AsRef<Path>>(&self, dir_path: P) -> Result<Vec<FileBatch>, String> {
+    fn collect_files_internal<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
         self.collect_files_impl(dir_path)
     }
 
     // Actual implementation
-    fn collect_files_impl<P: AsRef<Path>>(&self, dir_path: P) -> Result<Vec<FileBatch>, String> {
+    fn collect_files_impl<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
         let path = dir_path.as_ref();
         
         // Create walker that respects .gitignore
@@ -141,7 +142,8 @@ impl CodeDescriptor {
                 match result {
                     Ok(entry) => Some(entry),
                     Err(err) => {
-                        style::print_warning(&format!("Warning: {}", err));
+                        // Proper error logging but continue without failing
+                        style::print_warning(&format!("Warning during file scan: {}", err));
                         None
                     }
                 }
@@ -259,7 +261,7 @@ impl CodeDescriptor {
     }
 
     // Generate summaries for each batch of files using the low-tier AI model
-    async fn generate_batch_summaries(&self, batches: &[FileBatch]) -> Result<Vec<String>, String> {
+    async fn generate_batch_summaries(&self, batches: &[FileBatch]) -> AppResult<Vec<String>> {
         let mut summaries = Vec::new();
         
         // Create the low-tier AI model
@@ -297,9 +299,9 @@ impl CodeDescriptor {
     }
     
     // Create a low-tier AI model for batch processing
-    fn create_low_tier_model(&self) -> Result<Box<dyn AiModel>, String> {
+    fn create_low_tier_model(&self) -> AppResult<Box<dyn AiModel>> {
         factory::create_ai_model(self.ai_config.clone(), ModelTier::Low)
-            .map_err(|e| format!("Failed to create AI model: {}", e))
+            .map_err(|e| AppError::Ai(e))
     }
     
     // Format batch description for logging
@@ -417,11 +419,11 @@ Directory: {}\n\n{}",
     }
     
     /// Generate the final description using the high-tier AI model
-    async fn generate_final_description(&self, batch_summaries: &[String]) -> Result<String, String> {
+    async fn generate_final_description(&self, batch_summaries: &[String]) -> AppResult<String> {
         // Create the high-tier AI model
         style::print_info("📚 Creating high-tier AI model for final analysis...");
         let high_tier_model = factory::create_ai_model(self.ai_config.clone(), ModelTier::High)
-            .map_err(|e| format!("Failed to create AI model: {}", e))?;
+            .map_err(|e| AppError::Ai(e))?;
         
         // Join all the summaries
         let all_summaries = batch_summaries.join("\n\n---\n\n");
@@ -464,9 +466,9 @@ Here are the component summaries:
                 text
             },
             Err(e) => {
-                let error_msg = format!("Failed to generate final description: {}", e);
-                style::print_warning(&format!("❌ {}", error_msg));
-                return Err(error_msg);
+                let error = AppError::Ai(e);
+                style::print_warning(&format!("❌ Failed to generate final description: {}", error));
+                return Err(error);
             }
         };
         
