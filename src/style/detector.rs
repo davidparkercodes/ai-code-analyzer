@@ -18,6 +18,17 @@ impl Default for StyleDetector {
     }
 }
 
+// Helper function to count non-empty lines in a file
+fn content_lines_count(file_path: &str) -> usize {
+    if let Ok(content) = fs::read_to_string(file_path) {
+        content.lines()
+            .filter(|line| !line.trim().is_empty())
+            .count()
+    } else {
+        0 // If can't read the file, assume it's a small file
+    }
+}
+
 impl StyleDetector {
     pub fn new() -> Self {
         let mut detector = StyleDetector {
@@ -178,6 +189,55 @@ impl StyleDetector {
     }
     
     fn detect_indentation(&self, content: &str) -> IndentationType {
+        // Count non-empty lines to see if we have enough data for indentation detection
+        let non_empty_lines = content.lines()
+            .filter(|line| !line.trim().is_empty())
+            .count();
+            
+        // For very small files with just a few lines, indentation isn't meaningful
+        if non_empty_lines < 5 {
+            // For small files, detect basic indentation but don't report mixed/unknown
+            // Look for consistent indentation in the few lines available
+            let mut space_count = 0;
+            let mut tab_count = 0;
+            
+            for line in content.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                
+                if line.starts_with("\t") {
+                    tab_count += 1;
+                } else if line.starts_with(" ") {
+                    space_count += 1;
+                }
+            }
+            
+            if tab_count > 0 && space_count == 0 {
+                return IndentationType::Tabs;
+            } else if space_count > 0 && tab_count == 0 {
+                // Try to detect 2/4 spaces in small files
+                for line in content.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    
+                    let leading_spaces = line.len() - line.trim_start().len();
+                    if leading_spaces == 2 {
+                        return IndentationType::Spaces(2);
+                    } else if leading_spaces == 4 {
+                        return IndentationType::Spaces(4);
+                    } else if leading_spaces > 0 {
+                        return IndentationType::Spaces(leading_spaces);
+                    }
+                }
+            }
+            
+            // Default to the most common indentation for very small files
+            return IndentationType::Spaces(4);
+        }
+        
+        // Standard indentation detection for regular files
         let mut space_counts = HashMap::new();
         let mut has_tabs = false;
         
@@ -223,6 +283,14 @@ impl StyleDetector {
     }
     
     fn detect_brace_style(&self, content: &str, language: &str) -> BraceStyle {
+        // Count lines to see if we have enough data for brace style detection
+        let line_count = content.lines().count();
+        
+        // Default to same line for very small files or non-code files
+        if line_count < 5 {
+            return BraceStyle::SameLine; // Default for Rust
+        }
+        
         // This is a simplified implementation that works for C-like languages
         match language {
             "Rust" | "JavaScript" | "TypeScript" | "Java" | "C" | "C++" | "C#" => {
@@ -251,9 +319,16 @@ impl StyleDetector {
                 } else if next_line > 0 {
                     BraceStyle::NextLine
                 } else {
-                    BraceStyle::Unknown
+                    // If we can't detect any braces, use the default for the language
+                    match language {
+                        "Rust" | "JavaScript" | "TypeScript" | "Java" => BraceStyle::SameLine,
+                        "C" | "C++" | "C#" => BraceStyle::NextLine,
+                        _ => BraceStyle::Unknown,
+                    }
                 }
             },
+            // Set defaults for other languages
+            "Python" | "Ruby" => BraceStyle::SameLine, // No braces, but use default
             _ => BraceStyle::Unknown,
         }
     }
@@ -889,8 +964,14 @@ impl StyleDetector {
         let mut total_checks = 0;
         
         for (file_path, profile) in &analysis.file_profiles {
-            // Check indentation
-            if profile.indentation != global.indentation && global.indentation != IndentationType::Unknown {
+            // Calculate the number of non-empty lines in the file
+            let line_count = content_lines_count(file_path);
+            let is_small_file = line_count < 5;
+            
+            // Check indentation - skip for very small files (like mod.rs)
+            if !is_small_file && 
+               profile.indentation != global.indentation && 
+               global.indentation != IndentationType::Unknown {
                 total_checks += 1;
                 
                 let expected = match &global.indentation {
@@ -916,8 +997,9 @@ impl StyleDetector {
                 inconsistency_count += 1;
             }
             
-            // Check brace style
-            if profile.brace_style != global.brace_style && 
+            // Check brace style - skip for very small files
+            if !is_small_file && 
+               profile.brace_style != global.brace_style && 
                global.brace_style != BraceStyle::Unknown && 
                profile.brace_style != BraceStyle::Unknown {
                 total_checks += 1;
@@ -945,7 +1027,7 @@ impl StyleDetector {
                 inconsistency_count += 1;
             }
             
-            // Check line length
+            // Check line length - small files may still have long lines
             if profile.line_metrics.over_limit_count > 0 {
                 total_checks += 1;
                 
@@ -963,39 +1045,63 @@ impl StyleDetector {
                 inconsistency_count += 1;
             }
             
-            // Check naming conventions
-            for (category, convention) in &global.naming {
-                if let Some(file_convention) = profile.naming.get(category) {
-                    if file_convention != convention && 
-                       *file_convention != NamingConvention::Unknown && 
-                       *convention != NamingConvention::Unknown {
+            // Check naming conventions - only check for larger files
+            if !is_small_file {
+                for (category, convention) in &global.naming {
+                    if let Some(file_convention) = profile.naming.get(category) {
+                        if file_convention != convention && 
+                           *file_convention != NamingConvention::Unknown && 
+                           *convention != NamingConvention::Unknown {
+                            total_checks += 1;
+                            
+                            let expected = match convention {
+                                NamingConvention::CamelCase => "camelCase",
+                                NamingConvention::SnakeCase => "snake_case",
+                                NamingConvention::PascalCase => "PascalCase",
+                                NamingConvention::KebabCase => "kebab-case",
+                                _ => "consistent naming",
+                            };
+                            
+                            let actual = match file_convention {
+                                NamingConvention::CamelCase => "camelCase",
+                                NamingConvention::SnakeCase => "snake_case",
+                                NamingConvention::PascalCase => "PascalCase",
+                                NamingConvention::KebabCase => "kebab-case",
+                                NamingConvention::Mixed => "mixed conventions",
+                                NamingConvention::Unknown => "unknown convention",
+                            };
+                            
+                            inconsistencies.push(StyleInconsistency {
+                                file_path: file_path.clone(),
+                                line_number: None,
+                                description: format!(
+                                    "Inconsistent naming for {}: expected {}, found {}", 
+                                    category, expected, actual
+                                ),
+                                severity: InconsistencySeverity::Medium,
+                            });
+                            
+                            inconsistency_count += 1;
+                        }
+                    }
+                }
+            }
+            
+            // Check semicolon usage (only for larger files)
+            if !is_small_file {
+                if let (Some(global_semi), Some(file_semi)) = (global.has_trailing_semicolons, profile.has_trailing_semicolons) {
+                    if global_semi != file_semi {
                         total_checks += 1;
-                        
-                        let expected = match convention {
-                            NamingConvention::CamelCase => "camelCase",
-                            NamingConvention::SnakeCase => "snake_case",
-                            NamingConvention::PascalCase => "PascalCase",
-                            NamingConvention::KebabCase => "kebab-case",
-                            _ => "consistent naming",
-                        };
-                        
-                        let actual = match file_convention {
-                            NamingConvention::CamelCase => "camelCase",
-                            NamingConvention::SnakeCase => "snake_case",
-                            NamingConvention::PascalCase => "PascalCase",
-                            NamingConvention::KebabCase => "kebab-case",
-                            NamingConvention::Mixed => "mixed conventions",
-                            NamingConvention::Unknown => "unknown convention",
-                        };
                         
                         inconsistencies.push(StyleInconsistency {
                             file_path: file_path.clone(),
                             line_number: None,
                             description: format!(
-                                "Inconsistent naming for {}: expected {}, found {}", 
-                                category, expected, actual
+                                "Inconsistent semicolon usage: expected {}, found {}", 
+                                if global_semi { "semicolons" } else { "no semicolons" },
+                                if file_semi { "semicolons" } else { "no semicolons" }
                             ),
-                            severity: InconsistencySeverity::Medium,
+                            severity: InconsistencySeverity::Low,
                         });
                         
                         inconsistency_count += 1;
@@ -1003,27 +1109,7 @@ impl StyleDetector {
                 }
             }
             
-            // Check semicolon usage
-            if let (Some(global_semi), Some(file_semi)) = (global.has_trailing_semicolons, profile.has_trailing_semicolons) {
-                if global_semi != file_semi {
-                    total_checks += 1;
-                    
-                    inconsistencies.push(StyleInconsistency {
-                        file_path: file_path.clone(),
-                        line_number: None,
-                        description: format!(
-                            "Inconsistent semicolon usage: expected {}, found {}", 
-                            if global_semi { "semicolons" } else { "no semicolons" },
-                            if file_semi { "semicolons" } else { "no semicolons" }
-                        ),
-                        severity: InconsistencySeverity::Low,
-                    });
-                    
-                    inconsistency_count += 1;
-                }
-            }
-            
-            // Check trailing whitespace
+            // Check trailing whitespace - this can apply to files of any size
             if profile.trailing_whitespace_count > 0 {
                 total_checks += 1;
                 
