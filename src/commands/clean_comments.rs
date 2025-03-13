@@ -368,25 +368,16 @@ fn clean_file_content(
             continue;
         }
         
-        // Handle double-slash comments
-        if let Some(caps) = comment_regex.captures(line) {
-            *comment_count += 1;
-            
-            // Get the matched range for the comment
-            let mat = caps.get(0).unwrap();
-            let clean_line = &line[0..mat.start()];
-            
-            // Only add non-empty lines to result
-            if !clean_line.trim().is_empty() {
-                result.push_str(clean_line);
-                result.push('\n');
-            } else {
-                // Skip lines that only contained comments
-                continue;
-            }
+        // Parse the line to find string literals and only remove comments outside of them
+        let processed_line = if let Some(processed) = process_line_preserving_strings(line, comment_regex, comment_count) {
+            processed
         } else {
-            // No comment in this line, add it unchanged
-            result.push_str(line);
+            line.to_string()
+        };
+        
+        // Add the processed line if it's not empty
+        if !processed_line.trim().is_empty() {
+            result.push_str(&processed_line);
             result.push('\n');
         }
     }
@@ -402,6 +393,78 @@ fn display_clean_results(stats: &CleanStats, start_time: Instant) {
     println!("Files changed: {}", stats.changed_files);
     println!("Comments removed: {}", stats.removed_comments);
     style::print_success(&format!("Cleaning completed in {:.2?}", elapsed));
+}
+
+/// Process a line of code, preserving string literals while removing comments outside them
+fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
+    // State tracking for string parsing
+    let mut in_string = false;
+    let mut in_raw_string = false;
+    let mut escape_next = false;
+    let mut chars = line.chars().collect::<Vec<_>>();
+    let length = chars.len();
+    
+    // Find potential comment positions that are outside string literals
+    let mut comment_pos = None;
+    
+    for i in 0..length {
+        let c = chars[i];
+        
+        if escape_next {
+            // Skip escaped character
+            escape_next = false;
+            continue;
+        }
+        
+        match c {
+            // Handle escape sequences inside strings
+            '\\' if in_string => {
+                escape_next = true;
+            },
+            
+            // Handle string literals with double quotes
+            '"' => {
+                // Handle raw strings (r#"..."#)
+                if i > 0 && chars[i-1] == 'r' && !in_string && !in_raw_string {
+                    in_raw_string = true;
+                    continue;
+                }
+                
+                // Toggle normal string state if not in a raw string
+                if !in_raw_string {
+                    in_string = !in_string;
+                }
+            },
+            
+            // Handle closing of raw strings
+            '#' if in_raw_string && i > 0 && chars[i-1] == '"' => {
+                in_raw_string = false;
+            },
+            
+            // Detect comments outside of string literals
+            '/' if i + 1 < length && chars[i+1] == '/' && !in_string && !in_raw_string => {
+                comment_pos = Some(i);
+                break;
+            },
+            
+            _ => {}
+        }
+    }
+    
+    // If we found a comment outside string literals, remove it
+    if let Some(pos) = comment_pos {
+        *comment_count += 1;
+        let cleaned = line[0..pos].trim_end();
+        
+        if cleaned.is_empty() {
+            return None; // Entire line was a comment
+        }
+        
+        return Some(cleaned.to_string());
+    }
+    
+    // No comments found or they were inside string literals
+    None
 }
 
 fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
