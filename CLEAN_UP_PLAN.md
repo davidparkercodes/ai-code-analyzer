@@ -70,17 +70,27 @@ This document outlines our strategy for cleaning up the codebase according to Cl
     - ✅ `print_total_analysis_time`
   - ✅ Fix error variable naming (e → error)
 
-### Metrics Module
-- **`src/metrics/collector.rs`**:
-  - Split `collect_metrics` into:
-    - `walk_directory`
-    - `filter_entries`
-    - `process_entries`
-  - Rename metrics variables (`loc` → `lines_of_code`, etc.)
+### Metrics Module ✅
+- ✅ **`src/metrics/collector.rs`**:
+  - ✅ Split `collect_metrics` into:
+    - ✅ `validate_directory_path`
+    - ✅ `walk_directory`
+    - ✅ `count_directories`
+    - ✅ `filter_file_entries`
+    - ✅ `process_file_entries`
+    - ✅ `finalize_metrics`
+  - ✅ Fixed variable naming (e → error)
 
-- **`src/metrics/models.rs`**:
-  - Improve variable naming
-  - Streamline any complex methods
+- ✅ **`src/metrics/models.rs`**:
+  - ✅ Split `add_language_metrics` into multiple focused functions:
+    - ✅ `update_overall_metrics`
+    - ✅ `update_language_specific_metrics`
+    - ✅ `is_test_file`
+    - ✅ `update_test_metrics`
+    - ✅ `update_test_language_metrics`
+    - ✅ `update_production_metrics`
+    - ✅ `update_production_language_metrics`
+  - ✅ Parameter passing improved (using references where appropriate)
 
 ### Output Module
 - **`src/output/markdown/formatter.rs`**:

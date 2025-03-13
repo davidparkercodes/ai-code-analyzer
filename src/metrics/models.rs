@@ -79,11 +79,28 @@ impl CodeMetrics {
 
     pub fn add_language_metrics(&mut self, metrics: LanguageMetrics, file_path: &str) {
         // Update overall totals
+        self.update_overall_metrics(&metrics);
+        
+        // Update language-specific metrics
+        self.update_language_specific_metrics(&metrics);
+        
+        // Check if this is a test file and update corresponding metrics
+        let is_test_file = self.is_test_file(file_path);
+        
+        if is_test_file {
+            self.update_test_metrics(&metrics);
+        } else {
+            self.update_production_metrics(&metrics);
+        }
+    }
+    
+    fn update_overall_metrics(&mut self, metrics: &LanguageMetrics) {
         self.lines_of_code += metrics.lines_of_code;
         self.blank_lines += metrics.blank_lines;
         self.comment_lines += metrics.comment_lines;
-
-        // Update language-specific metrics
+    }
+    
+    fn update_language_specific_metrics(&mut self, metrics: &LanguageMetrics) {
         let entry = self
             .by_language
             .entry(metrics.language.clone())
@@ -93,56 +110,67 @@ impl CodeMetrics {
         entry.lines_of_code += metrics.lines_of_code;
         entry.blank_lines += metrics.blank_lines;
         entry.comment_lines += metrics.comment_lines;
+    }
+    
+    fn is_test_file(&self, file_path: &str) -> bool {
+        file_path.contains("/test") || 
+        file_path.contains("/tests/") || 
+        file_path.contains("_test.") || 
+        file_path.ends_with("_test.rs") ||
+        file_path.ends_with("_tests.rs") ||
+        file_path.ends_with("Test.java") ||
+        file_path.ends_with(".test.js") ||
+        file_path.ends_with(".test.ts") ||
+        file_path.ends_with("_spec.js") ||
+        file_path.ends_with("_spec.ts") ||
+        file_path.ends_with("_test.py") ||
+        file_path.ends_with("test_")
+    }
+    
+    fn update_test_metrics(&mut self, metrics: &LanguageMetrics) {
+        // Update test file counters
+        self.test_files += metrics.files;
+        self.test_lines_of_code += metrics.lines_of_code;
+        self.test_blank_lines += metrics.blank_lines;
+        self.test_comment_lines += metrics.comment_lines;
         
-        // Check if this is a test file
-        let is_test_file = file_path.contains("/test") || 
-            file_path.contains("/tests/") || 
-            file_path.contains("_test.") || 
-            file_path.ends_with("_test.rs") ||
-            file_path.ends_with("_tests.rs") ||
-            file_path.ends_with("Test.java") ||
-            file_path.ends_with(".test.js") ||
-            file_path.ends_with(".test.ts") ||
-            file_path.ends_with("_spec.js") ||
-            file_path.ends_with("_spec.ts") ||
-            file_path.ends_with("_test.py") ||
-            file_path.ends_with("test_");
+        // Update test language-specific metrics
+        self.update_test_language_metrics(metrics);
+    }
+    
+    fn update_test_language_metrics(&mut self, metrics: &LanguageMetrics) {
+        let test_entry = self
+            .test_by_language
+            .entry(metrics.language.clone())
+            .or_insert_with(|| LanguageMetrics::new(metrics.language.clone()));
+            
+        test_entry.files += metrics.files;
+        test_entry.lines_of_code += metrics.lines_of_code;
+        test_entry.blank_lines += metrics.blank_lines;
+        test_entry.comment_lines += metrics.comment_lines;
+    }
+    
+    fn update_production_metrics(&mut self, metrics: &LanguageMetrics) {
+        // Update production file counters
+        self.prod_files += metrics.files;
+        self.prod_lines_of_code += metrics.lines_of_code;
+        self.prod_blank_lines += metrics.blank_lines;
+        self.prod_comment_lines += metrics.comment_lines;
         
-        if is_test_file {
-            // Update test metrics
-            self.test_files += metrics.files;
-            self.test_lines_of_code += metrics.lines_of_code;
-            self.test_blank_lines += metrics.blank_lines;
-            self.test_comment_lines += metrics.comment_lines;
+        // Update production language-specific metrics
+        self.update_production_language_metrics(metrics);
+    }
+    
+    fn update_production_language_metrics(&mut self, metrics: &LanguageMetrics) {
+        let prod_entry = self
+            .prod_by_language
+            .entry(metrics.language.clone())
+            .or_insert_with(|| LanguageMetrics::new(metrics.language.clone()));
             
-            // Update test language-specific metrics
-            let test_entry = self
-                .test_by_language
-                .entry(metrics.language.clone())
-                .or_insert_with(|| LanguageMetrics::new(metrics.language.clone()));
-                
-            test_entry.files += metrics.files;
-            test_entry.lines_of_code += metrics.lines_of_code;
-            test_entry.blank_lines += metrics.blank_lines;
-            test_entry.comment_lines += metrics.comment_lines;
-        } else {
-            // Update production metrics
-            self.prod_files += metrics.files;
-            self.prod_lines_of_code += metrics.lines_of_code;
-            self.prod_blank_lines += metrics.blank_lines;
-            self.prod_comment_lines += metrics.comment_lines;
-            
-            // Update production language-specific metrics
-            let prod_entry = self
-                .prod_by_language
-                .entry(metrics.language.clone())
-                .or_insert_with(|| LanguageMetrics::new(metrics.language.clone()));
-                
-            prod_entry.files += metrics.files;
-            prod_entry.lines_of_code += metrics.lines_of_code;
-            prod_entry.blank_lines += metrics.blank_lines;
-            prod_entry.comment_lines += metrics.comment_lines;
-        }
+        prod_entry.files += metrics.files;
+        prod_entry.lines_of_code += metrics.lines_of_code;
+        prod_entry.blank_lines += metrics.blank_lines;
+        prod_entry.comment_lines += metrics.comment_lines;
     }
 }
 
