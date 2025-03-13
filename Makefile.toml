@@ -1,0 +1,72 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+CARGO_MAKE_CRATE_WORKSPACE_MEMBERS = [""]
+
+[tasks.default]
+dependencies = ["build"]
+
+[tasks.build]
+dependencies = ["build-release-all"]
+
+[tasks.build-release-all]
+description = "Build release binaries for all platforms"
+dependencies = [
+    "build-release-macos",
+    "build-release-linux",
+    "build-release-windows",
+]
+
+[tasks.build-release-macos]
+description = "Build macOS release binary"
+condition = { platforms = ["mac"] }
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.build-release-macos-arm]
+description = "Build macOS ARM release binary (when cross-compilation is set up)"
+condition = { platforms = ["mac"] }
+command = "cargo"
+args = ["build", "--release"]
+disabled = true
+
+[tasks.build-release-linux]
+description = "Build Linux release binary (when cross-compilation is set up)"
+command = "cargo"
+args = ["build", "--release"]
+disabled = true
+
+[tasks.build-release-windows]
+description = "Build Windows release binary (when cross-compilation is set up)"
+command = "cargo"
+args = ["build", "--release"]
+disabled = true
+
+[tasks.test]
+description = "Run all tests"
+command = "cargo"
+args = ["test"]
+
+[tasks.lint]
+description = "Run clippy to lint code"
+command = "cargo"
+args = ["clippy"]
+
+[tasks.format]
+description = "Run rustfmt to format code"
+command = "cargo"
+args = ["fmt"]
+
+[tasks.clean]
+description = "Clean build artifacts"
+command = "cargo"
+args = ["clean"]
+
+[tasks.release]
+description = "Prepare a release build for all platforms"
+dependencies = [
+    "clean",
+    "format",
+    "lint",
+    "test",
+    "build-release-all"
+]

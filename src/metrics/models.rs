@@ -30,16 +30,17 @@ impl CodeMetrics {
             by_language: HashMap::new(),
         }
     }
-    
+
     pub fn add_language_metrics(&mut self, metrics: LanguageMetrics) {
         self.lines_of_code += metrics.lines_of_code;
         self.blank_lines += metrics.blank_lines;
         self.comment_lines += metrics.comment_lines;
-        
-        let entry = self.by_language
+
+        let entry = self
+            .by_language
             .entry(metrics.language.clone())
             .or_insert_with(|| LanguageMetrics::new(metrics.language.clone()));
-            
+
         entry.files += metrics.files;
         entry.lines_of_code += metrics.lines_of_code;
         entry.blank_lines += metrics.blank_lines;

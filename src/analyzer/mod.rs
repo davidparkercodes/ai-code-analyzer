@@ -1,8 +1,8 @@
 pub mod file_analyzer;
 
-use std::path::Path;
 use crate::metrics::collector::MetricsCollector;
 use crate::metrics::reporter::MetricsReporter;
+use std::path::Path;
 
 pub struct Analyzer {
     collector: MetricsCollector,
@@ -19,10 +19,10 @@ impl Analyzer {
 
     pub fn analyze<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         println!("Analyzing directory: {}", path.as_ref().display());
-        
+
         let metrics = self.collector.collect_metrics(&path)?;
         self.reporter.report(&metrics);
-        
+
         Ok(())
     }
 }

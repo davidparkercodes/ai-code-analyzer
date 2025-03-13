@@ -38,11 +38,11 @@ fn main() {
                 eprintln!("Error analyzing directory: {}", e);
                 process::exit(1);
             }
-        },
+        }
         Commands::Metrics { path } => {
             let collector = metrics::collector::MetricsCollector::new();
             let reporter = metrics::reporter::MetricsReporter::new();
-            
+
             match collector.collect_metrics(path) {
                 Ok(metrics) => reporter.report(&metrics),
                 Err(e) => {
