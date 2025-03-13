@@ -6,13 +6,14 @@ use std::collections::HashMap;
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 
-use crate::ai::{AiConfig, ModelTier, factory, AiModel, AiError};
+use crate::ai::{AiConfig, ModelTier, factory, AiModel};
 use crate::cache::AnalysisCache;
 use crate::metrics::language::LanguageDetector;
 use crate::output::style;
 use crate::util::error::{AppError, AppResult};
 use crate::util::file_filter::FileFilter;
 use crate::util::parallel::ParallelProcessing;
+use std::sync::Arc;
 
 const BATCH_SIZE: usize = 10;
 
@@ -280,7 +281,7 @@ impl CodeDescriptor {
     }
     
     // Create a low-tier AI model for batch processing
-    fn create_low_tier_model(&self) -> AppResult<Box<dyn AiModel>> {
+    fn create_low_tier_model(&self) -> AppResult<Arc<dyn AiModel>> {
         factory::create_ai_model(self.ai_config.clone(), ModelTier::Low)
             .map_err(|e| AppError::Ai(e))
     }
@@ -359,7 +360,7 @@ Directory: {}\n\n{}",
     // Process the result of an AI batch analysis
     async fn process_batch_result(
         &self, 
-        model: &Box<dyn AiModel>, 
+        model: &Arc<dyn AiModel>, 
         prompt: &str, 
         summaries: &mut Vec<String>,
         batch_index: usize, 
