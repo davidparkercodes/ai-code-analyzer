@@ -80,7 +80,7 @@ pub enum Commands {
     },
 }
 
-pub async fn execute(cli: Cli) {
+pub async fn execute(cli: Cli) -> i32 {
     match cli.command {
         Commands::Run { path, no_parallel } => run::execute(path, no_parallel),
         Commands::Metrics { path, no_parallel } => metrics::execute(path, no_parallel),

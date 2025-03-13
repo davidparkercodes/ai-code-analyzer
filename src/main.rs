@@ -17,5 +17,9 @@ async fn main() {
     tracing_subscriber::fmt::init();
     
     let cli = Cli::parse();
-    execute(cli).await;
+    let exit_code = execute(cli).await;
+    
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
 }
