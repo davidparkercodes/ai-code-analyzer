@@ -361,6 +361,7 @@ dependencies = [
  "assert_cmd",
  "cargo-make",
  "clap",
+ "ignore",
  "predicates",
  "tempfile",
  "walkdir",

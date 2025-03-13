@@ -62,10 +62,12 @@ fn test_collect_metrics() {
 
     // We should have 3 files and 4 directories (root, src, src/utils, tests)
     assert_eq!(metrics.total_files, 3);
-    assert_eq!(metrics.total_directories, 4);
+    assert_eq!(metrics.total_directories, 4); // temp_dir, src, src/utils, tests
 
     // Check language breakdown
     assert_eq!(metrics.by_language.len(), 3); // Rust, Python, JavaScript
+
+    // Verify Rust metrics
     let rust_metrics = metrics
         .by_language
         .get("Rust")
