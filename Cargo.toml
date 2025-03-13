@@ -15,3 +15,6 @@ walkdir = "2.4.0"
 
 [dev-dependencies]
 cargo-make = "0.37.24"
+tempfile = "3.10.1"
+assert_cmd = "2.0.13"
+predicates = "3.0.4"
