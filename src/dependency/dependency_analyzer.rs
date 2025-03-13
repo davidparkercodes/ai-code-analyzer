@@ -227,81 +227,132 @@ impl DependencyAnalyzer {
         
         let import_patterns = self.supported_languages.get(language)?;
         
+        match language {
+            "Rust" => self.extract_rust_dependencies(&content, import_patterns),
+            "JavaScript" | "TypeScript" => self.extract_js_dependencies(&content, import_patterns),
+            "Python" => self.extract_python_dependencies(&content, import_patterns),
+            _ => Some(Vec::new())
+        }
+    }
+    
+    fn extract_rust_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
         let mut dependencies = Vec::new();
         
         for line in content.lines() {
             let trimmed = line.trim();
             
             for pattern in import_patterns {
-                match language {
-                    "Rust" => {
-                        if pattern == "use" && trimmed.starts_with("use ") {
-                            let parts: Vec<&str> = trimmed.split(&[';', ' ', '{', '}', ':'][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() && !module.starts_with("crate::") && !module.starts_with("self::") && !module.starts_with("std::") {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        } else if pattern == "mod" && trimmed.starts_with("mod ") && !trimmed.contains('{') {
-                            let parts: Vec<&str> = trimmed.split(&[';', ' '][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        }
-                    },
-                    "JavaScript" | "TypeScript" => {
-                        if pattern == "import" && trimmed.starts_with("import ") {
-                            if let Some(from_index) = trimmed.find(" from ") {
-                                if let Some(quote_start) = trimmed[from_index + 6..].find(&['\"', '\''][..]) {
-                                    if let Some(quote_end) = trimmed[(from_index + 6 + quote_start + 1)..].find(&['\"', '\''][..]) {
-                                        let module = &trimmed[(from_index + 6 + quote_start + 1)..(from_index + 6 + quote_start + 1 + quote_end)];
-                                        if !module.is_empty() && !module.starts_with('@') {
-                                            dependencies.push(module.to_string());
-                                        }
-                                    }
-                                }
-                            }
-                        } else if pattern == "require" && trimmed.contains("require(") {
-                            let parts: Vec<&str> = trimmed.split("require(").collect();
-                            if parts.len() > 1 {
-                                let quote_parts: Vec<&str> = parts[1].split(&['\"', '\''][..]).collect();
-                                if quote_parts.len() > 1 {
-                                    let module = quote_parts[1].trim();
-                                    if !module.is_empty() && !module.starts_with('@') {
-                                        dependencies.push(module.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "Python" => {
-                        if pattern == "import" && trimmed.starts_with("import ") {
-                            let parts: Vec<&str> = trimmed.split(&[' ', ','][..]).collect();
-                            if parts.len() > 1 {
-                                let module = parts[1].trim();
-                                if !module.is_empty() && module != "as" {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        } else if pattern == "from" && trimmed.starts_with("from ") {
-                            if let Some(import_index) = trimmed.find(" import ") {
-                                let module = trimmed[5..import_index].trim();
-                                if !module.is_empty() && module != "." && module != ".." {
-                                    dependencies.push(module.to_string());
-                                }
-                            }
-                        }
-                    },
-                    _ => {}
+                if pattern == "use" && trimmed.starts_with("use ") {
+                    self.extract_rust_use_dependency(trimmed, &mut dependencies);
+                } else if pattern == "mod" && trimmed.starts_with("mod ") && !trimmed.contains('{') {
+                    self.extract_rust_mod_dependency(trimmed, &mut dependencies);
                 }
             }
         }
         
         Some(dependencies)
+    }
+    
+    fn extract_rust_use_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[';', ' ', '{', '}', ':'][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() && !module.starts_with("crate::") && 
+               !module.starts_with("self::") && !module.starts_with("std::") {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_rust_mod_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[';', ' '][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_js_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
+        let mut dependencies = Vec::new();
+        
+        for line in content.lines() {
+            let trimmed = line.trim();
+            
+            for pattern in import_patterns {
+                if pattern == "import" && trimmed.starts_with("import ") {
+                    self.extract_js_import_dependency(trimmed, &mut dependencies);
+                } else if pattern == "require" && trimmed.contains("require(") {
+                    self.extract_js_require_dependency(trimmed, &mut dependencies);
+                }
+            }
+        }
+        
+        Some(dependencies)
+    }
+    
+    fn extract_js_import_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        if let Some(from_index) = line.find(" from ") {
+            if let Some(quote_start) = line[from_index + 6..].find(&['\"', '\''][..]) {
+                if let Some(quote_end) = line[(from_index + 6 + quote_start + 1)..].find(&['\"', '\''][..]) {
+                    let module = &line[(from_index + 6 + quote_start + 1)..(from_index + 6 + quote_start + 1 + quote_end)];
+                    if !module.is_empty() && !module.starts_with('@') {
+                        dependencies.push(module.to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    fn extract_js_require_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split("require(").collect();
+        if parts.len() > 1 {
+            let quote_parts: Vec<&str> = parts[1].split(&['\"', '\''][..]).collect();
+            if quote_parts.len() > 1 {
+                let module = quote_parts[1].trim();
+                if !module.is_empty() && !module.starts_with('@') {
+                    dependencies.push(module.to_string());
+                }
+            }
+        }
+    }
+    
+    fn extract_python_dependencies(&self, content: &str, import_patterns: &[String]) -> Option<Vec<String>> {
+        let mut dependencies = Vec::new();
+        
+        for line in content.lines() {
+            let trimmed = line.trim();
+            
+            for pattern in import_patterns {
+                if pattern == "import" && trimmed.starts_with("import ") {
+                    self.extract_python_import_dependency(trimmed, &mut dependencies);
+                } else if pattern == "from" && trimmed.starts_with("from ") {
+                    self.extract_python_from_dependency(trimmed, &mut dependencies);
+                }
+            }
+        }
+        
+        Some(dependencies)
+    }
+    
+    fn extract_python_import_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        let parts: Vec<&str> = line.split(&[' ', ','][..]).collect();
+        if parts.len() > 1 {
+            let module = parts[1].trim();
+            if !module.is_empty() && module != "as" {
+                dependencies.push(module.to_string());
+            }
+        }
+    }
+    
+    fn extract_python_from_dependency(&self, line: &str, dependencies: &mut Vec<String>) {
+        if let Some(import_index) = line.find(" import ") {
+            let module = line[5..import_index].trim();
+            if !module.is_empty() && module != "." && module != ".." {
+                dependencies.push(module.to_string());
+            }
+        }
     }
     
     fn normalize_path(&self, path: &Path) -> String {
