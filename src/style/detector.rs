@@ -719,6 +719,7 @@ impl StyleDetector {
         let mut brace_style_counts: HashMap<String, usize> = HashMap::new();
         let mut naming_conventions: HashMap<String, HashMap<String, usize>> = HashMap::new();
         let mut semicolon_counts = HashMap::new();
+        let mut language_counts: HashMap<String, usize> = HashMap::new();
         
         let mut total_line_length = 0.0;
         let mut max_line_length = 0;
@@ -735,6 +736,11 @@ impl StyleDetector {
         let profile_count = analysis.file_profiles.len();
         
         for profile in analysis.file_profiles.values() {
+            // Count file types
+            if !profile.file_type.is_empty() {
+                *language_counts.entry(profile.file_type.clone()).or_insert(0) += 1;
+            }
+            
             // Count indentation types
             let indent_key = match &profile.indentation {
                 IndentationType::Spaces(n) => format!("spaces-{}", n),
@@ -795,6 +801,11 @@ impl StyleDetector {
         
         // Create the global profile
         let mut global = StyleProfile::default();
+        
+        // Determine most common language
+        if let Some((language, _)) = language_counts.iter().max_by_key(|&(_, count)| *count) {
+            global.file_type = language.clone();
+        }
         
         // Determine most common indentation
         if let Some((indent_key, _)) = indentation_counts.iter().max_by_key(|&(_, count)| *count) {

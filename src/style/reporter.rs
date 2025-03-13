@@ -90,6 +90,15 @@ impl StyleReporter {
             StyledText::new("===================").foreground(ThemeColors::SEPARATOR)
         );
         
+        // Print file type if available
+        if !profile.file_type.is_empty() {
+            println!(
+                "{}: {}",
+                highlight("Primary Language"),
+                StyledText::new(&profile.file_type).foreground(ThemeColors::LANGUAGE)
+            );
+        }
+        
         // Print indentation style
         println!(
             "{}: {}",
