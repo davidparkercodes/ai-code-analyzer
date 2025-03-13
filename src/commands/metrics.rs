@@ -28,7 +28,7 @@ fn execute_metrics_command(path: String, no_parallel: bool) -> AppResult<()> {
 
 fn initialize_metrics_collector(parallel_enabled: bool) -> MetricsCollector {
     MetricsCollector::new()
-        .with_parallel(parallel_enabled)
+        .enable_parallel_processing(parallel_enabled)
 }
 
 fn collect_code_metrics(

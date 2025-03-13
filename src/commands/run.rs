@@ -24,7 +24,7 @@ fn execute_run_command(path: String, no_parallel: bool) -> AppResult<()> {
 
 fn initialize_analyzer(parallel_enabled: bool) -> Analyzer {
     Analyzer::new()
-        .with_parallel(parallel_enabled)
+        .enable_parallel_processing(parallel_enabled)
 }
 
 fn perform_codebase_analysis(

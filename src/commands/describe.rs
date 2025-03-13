@@ -54,7 +54,7 @@ fn load_ai_configuration() -> AppResult<AiConfig> {
 
 fn initialize_code_descriptor(ai_config: AiConfig, parallel_enabled: bool) -> CodeDescriptor {
     CodeDescriptor::new(ai_config)
-        .with_parallel(parallel_enabled)
+        .enable_parallel_processing(parallel_enabled)
 }
 
 fn display_analysis_header(directory_path: &str) {

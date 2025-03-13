@@ -39,7 +39,7 @@ fn execute_dependencies_command(
 
 fn initialize_analyzer(parallel_enabled: bool) -> DependencyAnalyzer {
     DependencyAnalyzer::new()
-        .with_parallel(parallel_enabled)
+        .enable_parallel_processing(parallel_enabled)
 }
 
 fn perform_dependency_analysis(

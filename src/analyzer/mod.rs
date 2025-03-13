@@ -42,9 +42,13 @@ impl Analyzer {
 }
 
 impl ParallelProcessing for Analyzer {
-    fn with_parallel(mut self, parallel: bool) -> Self {
+    fn enable_parallel_processing(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
+    }
+    
+    fn with_parallel(self, parallel: bool) -> Self {
+        self.enable_parallel_processing(parallel)
     }
     
     fn is_parallel(&self) -> bool {
