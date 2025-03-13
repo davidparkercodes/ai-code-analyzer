@@ -90,9 +90,19 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
 - Lint: `cargo clippy`
 - Run: `cargo run -- [path]`
 
+## CRITICAL: NO AI ATTRIBUTION
+- ⚠️ NEVER include "Generated with Claude Code", "Co-Authored-By: Claude", or ANY similar attribution in:
+  - Git commits
+  - Pull requests
+  - Code or comments
+  - Commit messages
+  - PR descriptions
+  - Documentation
+  - Any other files or outputs
+- ⚠️ NEVER mention Claude, AI, or any form of AI assistance anywhere in the codebase or commit history
+- ⚠️ When making git commits, NEVER add any co-author or attribution lines
+
 ## Important Notes
-- NEVER include "Generated with Claude Code" or similar attribution in git commits, PRs, or any code
-- NEVER mention Claude or AI assistance in code, comments, commit messages, or PR descriptions
 - Maintain the modular architecture to allow for future extension
 - All public APIs should have clear interfaces and documentation
 - Handle errors gracefully with informative messages
