@@ -163,15 +163,20 @@ impl StyleDetector {
         let mut profile = StyleProfile::new(language);
         
         // Detect indentation style
-        profile.indentation = self.detect_indentation(content);
+        let (indentation, indentation_violations) = self.detect_indentation(content);
+        profile.indentation = indentation;
+        profile.indentation_violation_lines = indentation_violations;
         
         // Detect brace style
-        profile.brace_style = self.detect_brace_style(content, language);
+        let (brace_style, brace_violations) = self.detect_brace_style(content, language);
+        profile.brace_style = brace_style;
+        profile.brace_style_violation_lines = brace_violations;
         
         // Analyze line metrics
-        let (line_metrics, trailing_whitespace) = self.analyze_lines(content);
+        let (line_metrics, trailing_whitespace, whitespace_lines) = self.analyze_lines(content);
         profile.line_metrics = line_metrics;
         profile.trailing_whitespace_count = trailing_whitespace;
+        profile.trailing_whitespace_lines = whitespace_lines;
         
         // Analyze function metrics
         profile.function_metrics = self.analyze_functions(content, language);
@@ -188,7 +193,10 @@ impl StyleDetector {
         profile
     }
     
-    fn detect_indentation(&self, content: &str) -> IndentationType {
+    fn detect_indentation(&self, content: &str) -> (IndentationType, Vec<usize>) {
+        // Track lines with inconsistent indentation
+        let mut inconsistent_lines = Vec::new();
+        
         // Count non-empty lines to see if we have enough data for indentation detection
         let non_empty_lines = content.lines()
             .filter(|line| !line.trim().is_empty())
@@ -214,7 +222,7 @@ impl StyleDetector {
             }
             
             if tab_count > 0 && space_count == 0 {
-                return IndentationType::Tabs;
+                return (IndentationType::Tabs, inconsistent_lines);
             } else if space_count > 0 && tab_count == 0 {
                 // Try to detect 2/4 spaces in small files
                 for line in content.lines() {
@@ -224,48 +232,63 @@ impl StyleDetector {
                     
                     let leading_spaces = line.len() - line.trim_start().len();
                     if leading_spaces == 2 {
-                        return IndentationType::Spaces(2);
+                        return (IndentationType::Spaces(2), inconsistent_lines);
                     } else if leading_spaces == 4 {
-                        return IndentationType::Spaces(4);
+                        return (IndentationType::Spaces(4), inconsistent_lines);
                     } else if leading_spaces > 0 {
-                        return IndentationType::Spaces(leading_spaces);
+                        return (IndentationType::Spaces(leading_spaces), inconsistent_lines);
                     }
                 }
             }
             
             // Default to the most common indentation for very small files
-            return IndentationType::Spaces(4);
+            return (IndentationType::Spaces(4), inconsistent_lines);
         }
         
         // Standard indentation detection for regular files
         let mut space_counts = HashMap::new();
         let mut has_tabs = false;
+        let mut lines_with_tabs = Vec::new();
+        let mut indentation_by_line = HashMap::new();
         
-        for line in content.lines() {
+        for (i, line) in content.lines().enumerate() {
+            let line_number = i + 1;
+            
             if line.trim().is_empty() {
                 continue;
             }
             
             let leading_spaces = line.len() - line.trim_start().len();
             
-            if line.starts_with("\t") {
+            if line.starts_with('\t') {
                 has_tabs = true;
+                lines_with_tabs.push(line_number);
+                indentation_by_line.insert(line_number, IndentationType::Tabs);
             } else if leading_spaces > 0 {
                 *space_counts.entry(leading_spaces).or_insert(0) += 1;
+                indentation_by_line.insert(line_number, IndentationType::Spaces(leading_spaces));
             }
         }
         
         // Determine most common indentation
         if has_tabs {
             if !space_counts.is_empty() {
-                return IndentationType::Mixed;
+                // Track lines with inconsistent indentation in a mixed file
+                for (line_number, indent_type) in &indentation_by_line {
+                    match indent_type {
+                        IndentationType::Tabs => {},  // Tabs are common in this file
+                        IndentationType::Spaces(_) => inconsistent_lines.push(*line_number), // Spaces are inconsistent
+                        _ => {}
+                    }
+                }
+                return (IndentationType::Mixed, inconsistent_lines);
             } else {
-                return IndentationType::Tabs;
+                return (IndentationType::Tabs, inconsistent_lines);
             }
         }
         
         if space_counts.is_empty() {
-            return IndentationType::Unknown;
+            return (IndentationType::Unknown, inconsistent_lines);
         }
         
         // Find most common space count
@@ -276,19 +299,36 @@ impl StyleDetector {
         // Check if it's a common indentation size (2, 4, 8)
         let common_spaces = *most_common;
         if common_spaces % 2 == 0 && common_spaces <= 8 {
-            IndentationType::Spaces(common_spaces)
+            // Track lines with inconsistent indentation
+            for (line_number, indent_type) in &indentation_by_line {
+                match indent_type {
+                    IndentationType::Spaces(n) if *n != common_spaces => {
+                        inconsistent_lines.push(*line_number);
+                    },
+                    _ => {}
+                }
+            }
+            (IndentationType::Spaces(common_spaces), inconsistent_lines)
         } else {
-            IndentationType::Mixed
+            // All lines with indentation are inconsistent in a Mixed file
+            for line_number in indentation_by_line.keys() {
+                inconsistent_lines.push(*line_number);
+            }
+            (IndentationType::Mixed, inconsistent_lines)
         }
     }
     
-    fn detect_brace_style(&self, content: &str, language: &str) -> BraceStyle {
+    fn detect_brace_style(&self, content: &str, language: &str) -> (BraceStyle, Vec<usize>) {
+        // Track lines with inconsistent brace style
+        let mut inconsistent_lines = Vec::new();
+        let lines: Vec<&str> = content.lines().collect();
+        
         // Count lines to see if we have enough data for brace style detection
-        let line_count = content.lines().count();
+        let line_count = lines.len();
         
         // Default to same line for very small files or non-code files
         if line_count < 5 {
-            return BraceStyle::SameLine; // Default for Rust
+            return (BraceStyle::SameLine, inconsistent_lines); // Default for Rust
         }
         
         // This is a simplified implementation that works for C-like languages
@@ -301,39 +341,75 @@ impl StyleDetector {
                 let same_line_pattern = Regex::new(r"\)\s*\{").unwrap();
                 
                 // Regex to detect patterns like ")\n{" (next line)
-                let next_line_pattern = Regex::new(r"\)\s*[\r\n]+\s*\{").unwrap();
+                let _next_line_pattern = Regex::new(r"\)\s*[\r\n]+\s*\{").unwrap();
                 
-                same_line += same_line_pattern.find_iter(content).count();
-                next_line += next_line_pattern.find_iter(content).count();
+                // Check each line for brace styles and track line numbers
+                for (i, line) in lines.iter().enumerate() {
+                    let line_number = i + 1;
+                    
+                    if same_line_pattern.is_match(line) {
+                        same_line += 1;
+                    }
+                    
+                    // For next line style, we need to check if this line has a closing parenthesis
+                    // and the next line has an opening brace
+                    if i < line_count - 1 && line.trim().ends_with(')') && lines[i+1].trim().starts_with('{') {
+                        next_line += 1;
+                        // Mark both this line and the next line
+                        inconsistent_lines.push(line_number);
+                        inconsistent_lines.push(line_number + 1);
+                    }
+                }
                 
+                // Clear inconsistent lines if the style is consistent
                 if same_line > 0 && next_line > 0 {
                     if same_line > next_line * 2 {
-                        BraceStyle::SameLine
+                        // Same line is dominant, so mark only next line style as inconsistent
+                        inconsistent_lines.clear();
+                        for (i, line) in lines.iter().enumerate() {
+                            let line_number = i + 1;
+                            if i < line_count - 1 && line.trim().ends_with(')') && lines[i+1].trim().starts_with('{') {
+                                inconsistent_lines.push(line_number);
+                                inconsistent_lines.push(line_number + 1);
+                            }
+                        }
+                        (BraceStyle::SameLine, inconsistent_lines)
                     } else if next_line > same_line * 2 {
-                        BraceStyle::NextLine
+                        // Next line is dominant, so mark only same line style as inconsistent
+                        inconsistent_lines.clear();
+                        for (i, line) in lines.iter().enumerate() {
+                            let line_number = i + 1;
+                            if same_line_pattern.is_match(line) {
+                                inconsistent_lines.push(line_number);
+                            }
+                        }
+                        (BraceStyle::NextLine, inconsistent_lines)
                     } else {
-                        BraceStyle::Mixed
+                        // Mixed style, keep all inconsistencies
+                        (BraceStyle::Mixed, inconsistent_lines)
                     }
                 } else if same_line > 0 {
-                    BraceStyle::SameLine
+                    // Clear inconsistencies since everything is consistent
+                    (BraceStyle::SameLine, Vec::new())
                 } else if next_line > 0 {
-                    BraceStyle::NextLine
+                    // Clear inconsistencies since everything is consistent
+                    (BraceStyle::NextLine, Vec::new())
                 } else {
                     // If we can't detect any braces, use the default for the language
                     match language {
-                        "Rust" | "JavaScript" | "TypeScript" | "Java" => BraceStyle::SameLine,
-                        "C" | "C++" | "C#" => BraceStyle::NextLine,
-                        _ => BraceStyle::Unknown,
+                        "Rust" | "JavaScript" | "TypeScript" | "Java" => (BraceStyle::SameLine, Vec::new()),
+                        "C" | "C++" | "C#" => (BraceStyle::NextLine, Vec::new()),
+                        _ => (BraceStyle::Unknown, Vec::new()),
                     }
                 }
             },
             // Set defaults for other languages
-            "Python" | "Ruby" => BraceStyle::SameLine, // No braces, but use default
-            _ => BraceStyle::Unknown,
+            "Python" | "Ruby" => (BraceStyle::SameLine, Vec::new()), // No braces, but use default
+            _ => (BraceStyle::Unknown, Vec::new()),
         }
     }
     
-    fn analyze_lines(&self, content: &str) -> (LineMetrics, usize) {
+    fn analyze_lines(&self, content: &str) -> (LineMetrics, usize, Vec<usize>) {
         let lines: Vec<&str> = content.lines().collect();
         
         if lines.is_empty() {
@@ -342,8 +418,10 @@ impl StyleDetector {
                     avg_length: 0.0,
                     max_length: 0,
                     over_limit_count: 0,
+                    long_line_numbers: Vec::new(),
                 },
-                0
+                0,
+                Vec::new()
             );
         }
         
@@ -351,8 +429,11 @@ impl StyleDetector {
         let mut max_length = 0;
         let mut over_limit = 0;
         let mut trailing_whitespace = 0;
+        let mut long_line_numbers = Vec::new();
+        let mut whitespace_line_numbers = Vec::new();
         
-        for line in &lines {
+        for (i, line) in lines.iter().enumerate() {
+            let line_number = i + 1; // Lines are 1-indexed
             let line_len = line.len();
             total_length += line_len;
             
@@ -362,11 +443,13 @@ impl StyleDetector {
             
             if line_len > LINE_LENGTH_LIMIT {
                 over_limit += 1;
+                long_line_numbers.push(line_number);
             }
             
             // Check trailing whitespace
             if !line.is_empty() && (line.ends_with(' ') || line.ends_with('\t')) {
                 trailing_whitespace += 1;
+                whitespace_line_numbers.push(line_number);
             }
         }
         
@@ -375,8 +458,10 @@ impl StyleDetector {
                 avg_length: total_length as f64 / lines.len() as f64,
                 max_length,
                 over_limit_count: over_limit,
+                long_line_numbers,
             },
-            trailing_whitespace
+            trailing_whitespace,
+            whitespace_line_numbers
         )
     }
     
@@ -911,6 +996,7 @@ impl StyleDetector {
             avg_length: total_line_length / profile_count as f64,
             max_length: max_line_length,
             over_limit_count: over_limit_lines,
+            long_line_numbers: Vec::new(), // Global profile doesn't track specific lines
         };
         
         // Calculate global function metrics
@@ -987,12 +1073,44 @@ impl StyleDetector {
                     IndentationType::Unknown => "unknown indentation".to_string(),
                 };
                 
-                inconsistencies.push(StyleInconsistency {
-                    file_path: file_path.clone(),
-                    line_number: None,
-                    description: format!("Inconsistent indentation: expected {}, found {}", expected, actual),
-                    severity: InconsistencySeverity::Medium,
-                });
+                // If we have specific line numbers for indentation violations, create an inconsistency for each
+                if !profile.indentation_violation_lines.is_empty() {
+                    // Get first 5 violation lines (to avoid too many repeated items)
+                    let first_violations = profile.indentation_violation_lines.iter()
+                        .take(5)
+                        .copied()
+                        .collect::<Vec<_>>();
+                
+                    for &line_number in &first_violations {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: Some(line_number),
+                            description: format!("Inconsistent indentation: expected {}, found {}", expected, actual),
+                            severity: InconsistencySeverity::Medium,
+                        });
+                    }
+                    
+                    // If there are more violations than we're showing
+                    if profile.indentation_violation_lines.len() > first_violations.len() {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: None,
+                            description: format!(
+                                "And {} more lines with inconsistent indentation", 
+                                profile.indentation_violation_lines.len() - first_violations.len()
+                            ),
+                            severity: InconsistencySeverity::Medium,
+                        });
+                    }
+                } else {
+                    // No specific lines identified, add a general inconsistency
+                    inconsistencies.push(StyleInconsistency {
+                        file_path: file_path.clone(),
+                        line_number: None,
+                        description: format!("Inconsistent indentation: expected {}, found {}", expected, actual),
+                        severity: InconsistencySeverity::Medium,
+                    });
+                }
                 
                 inconsistency_count += 1;
             }
@@ -1017,12 +1135,44 @@ impl StyleDetector {
                     BraceStyle::Unknown => "unknown style",
                 };
                 
-                inconsistencies.push(StyleInconsistency {
-                    file_path: file_path.clone(),
-                    line_number: None,
-                    description: format!("Inconsistent brace style: expected {}, found {}", expected, actual),
-                    severity: InconsistencySeverity::Low,
-                });
+                // If we have specific line numbers for brace style violations, create an inconsistency for each
+                if !profile.brace_style_violation_lines.is_empty() {
+                    // Get first 5 violation lines (to avoid too many repeated items)
+                    let first_violations = profile.brace_style_violation_lines.iter()
+                        .take(5)
+                        .copied()
+                        .collect::<Vec<_>>();
+                
+                    for &line_number in &first_violations {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: Some(line_number),
+                            description: format!("Inconsistent brace style: expected {}, found {}", expected, actual),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                    
+                    // If there are more violations than we're showing
+                    if profile.brace_style_violation_lines.len() > first_violations.len() {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: None,
+                            description: format!(
+                                "And {} more lines with inconsistent brace style", 
+                                profile.brace_style_violation_lines.len() - first_violations.len()
+                            ),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                } else {
+                    // No specific lines identified, add a general inconsistency
+                    inconsistencies.push(StyleInconsistency {
+                        file_path: file_path.clone(),
+                        line_number: None,
+                        description: format!("Inconsistent brace style: expected {}, found {}", expected, actual),
+                        severity: InconsistencySeverity::Low,
+                    });
+                }
                 
                 inconsistency_count += 1;
             }
@@ -1031,16 +1181,51 @@ impl StyleDetector {
             if profile.line_metrics.over_limit_count > 0 {
                 total_checks += 1;
                 
-                inconsistencies.push(StyleInconsistency {
-                    file_path: file_path.clone(),
-                    line_number: None,
-                    description: format!(
-                        "File contains {} lines over the recommended length limit ({})", 
-                        profile.line_metrics.over_limit_count,
-                        LINE_LENGTH_LIMIT
-                    ),
-                    severity: InconsistencySeverity::Low,
-                });
+                // If we have specific line numbers for long lines, create an inconsistency for each
+                if !profile.line_metrics.long_line_numbers.is_empty() {
+                    // Get first 5 long lines (to avoid too many repeated items)
+                    let first_long_lines = profile.line_metrics.long_line_numbers.iter()
+                        .take(5)
+                        .copied()
+                        .collect::<Vec<_>>();
+                
+                    for &line_number in &first_long_lines {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: Some(line_number),
+                            description: format!(
+                                "Line exceeds recommended length limit of {} characters", 
+                                LINE_LENGTH_LIMIT
+                            ),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                    
+                    // If there are more long lines than we're showing
+                    if profile.line_metrics.long_line_numbers.len() > first_long_lines.len() {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: None,
+                            description: format!(
+                                "And {} more lines exceed the length limit", 
+                                profile.line_metrics.long_line_numbers.len() - first_long_lines.len()
+                            ),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                } else {
+                    // No specific lines identified, add a general inconsistency
+                    inconsistencies.push(StyleInconsistency {
+                        file_path: file_path.clone(),
+                        line_number: None,
+                        description: format!(
+                            "File contains {} lines over the recommended length limit ({})", 
+                            profile.line_metrics.over_limit_count,
+                            LINE_LENGTH_LIMIT
+                        ),
+                        severity: InconsistencySeverity::Low,
+                    });
+                }
                 
                 inconsistency_count += 1;
             }
@@ -1113,12 +1298,44 @@ impl StyleDetector {
             if profile.trailing_whitespace_count > 0 {
                 total_checks += 1;
                 
-                inconsistencies.push(StyleInconsistency {
-                    file_path: file_path.clone(),
-                    line_number: None,
-                    description: format!("File contains {} lines with trailing whitespace", profile.trailing_whitespace_count),
-                    severity: InconsistencySeverity::Low,
-                });
+                // If we have specific line numbers for trailing whitespace, create an inconsistency for each
+                if !profile.trailing_whitespace_lines.is_empty() {
+                    // Get first 5 trailing whitespace lines (to avoid too many repeated items)
+                    let first_whitespace_lines = profile.trailing_whitespace_lines.iter()
+                        .take(5)
+                        .copied()
+                        .collect::<Vec<_>>();
+                
+                    for &line_number in &first_whitespace_lines {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: Some(line_number),
+                            description: "Line contains trailing whitespace".to_string(),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                    
+                    // If there are more whitespace lines than we're showing
+                    if profile.trailing_whitespace_lines.len() > first_whitespace_lines.len() {
+                        inconsistencies.push(StyleInconsistency {
+                            file_path: file_path.clone(),
+                            line_number: None,
+                            description: format!(
+                                "And {} more lines with trailing whitespace", 
+                                profile.trailing_whitespace_lines.len() - first_whitespace_lines.len()
+                            ),
+                            severity: InconsistencySeverity::Low,
+                        });
+                    }
+                } else {
+                    // No specific lines identified, add a general inconsistency
+                    inconsistencies.push(StyleInconsistency {
+                        file_path: file_path.clone(),
+                        line_number: None,
+                        description: format!("File contains {} lines with trailing whitespace", profile.trailing_whitespace_count),
+                        severity: InconsistencySeverity::Low,
+                    });
+                }
                 
                 inconsistency_count += 1;
             }

@@ -31,6 +31,7 @@ pub struct LineMetrics {
     pub avg_length: f64,
     pub max_length: usize,
     pub over_limit_count: usize,
+    pub long_line_numbers: Vec<usize>, // Line numbers that exceed the limit
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +53,10 @@ pub struct StyleProfile {
     pub naming: HashMap<String, NamingConvention>,
     pub has_trailing_semicolons: Option<bool>,
     pub trailing_whitespace_count: usize,
+    pub trailing_whitespace_lines: Vec<usize>, // Line numbers with trailing whitespace
     pub comment_ratio: f64,
+    pub indentation_violation_lines: Vec<usize>, // Line numbers with inconsistent indentation
+    pub brace_style_violation_lines: Vec<usize>, // Line numbers with inconsistent brace style
 }
 
 impl Default for StyleProfile {
@@ -65,6 +69,7 @@ impl Default for StyleProfile {
                 avg_length: 0.0,
                 max_length: 0,
                 over_limit_count: 0,
+                long_line_numbers: Vec::new(),
             },
             function_metrics: FunctionMetrics {
                 avg_length: 0.0,
@@ -75,7 +80,10 @@ impl Default for StyleProfile {
             naming: HashMap::new(),
             has_trailing_semicolons: None,
             trailing_whitespace_count: 0,
+            trailing_whitespace_lines: Vec::new(),
             comment_ratio: 0.0,
+            indentation_violation_lines: Vec::new(),
+            brace_style_violation_lines: Vec::new(),
         }
     }
 }
