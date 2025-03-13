@@ -1,4 +1,5 @@
 // Import all test modules
+mod ai_config_test;
 mod analyzer_test;
 mod cache_test;
 mod dependency_graph_test;

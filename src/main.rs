@@ -1,9 +1,12 @@
+mod ai;
 mod analyzer;
 mod cache;
 mod dependency;
 mod metrics;
 mod output;
 mod style_analyzer;
+
+use ai::AiConfig;
 
 use clap::{Parser, Subcommand};
 use std::process;
@@ -68,7 +71,20 @@ enum Commands {
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    // Initialize logging
+    tracing_subscriber::fmt::init();
+    
+    // Load AI configuration (fails silently if no .env file)
+    let ai_config = match AiConfig::from_env() {
+        Ok(config) => config,
+        Err(e) => {
+            output::style::print_warning(&format!("AI configuration error: {}. Some features may be limited.", e));
+            AiConfig::default()
+        }
+    };
+    
     let cli = Cli::parse();
 
     match &cli.command {

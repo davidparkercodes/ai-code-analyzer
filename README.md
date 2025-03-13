@@ -11,6 +11,7 @@ A high-performance CLI tool built in Rust that analyzes and extracts insights fr
 - Circular dependency detection
 - Exclusion of test files from dependency analysis
 - Export to DOT format for visualizing dependencies with tools like Graphviz
+- AI-powered code analysis with multi-provider support
 
 ## Installation
 
@@ -157,6 +158,52 @@ Or simply run the provided script:
 ```bash
 ./scripts/install-hooks.sh
 ```
+
+## AI Integration
+
+CodeAnalyzer supports multiple AI providers to enhance code analysis capabilities:
+
+### Supported Providers
+- **Anthropic** (Claude models)
+- **OpenAI** (GPT models)
+- **Mistral** (Mistral models)
+
+### Model Tiers
+Each provider supports three tiers of models:
+- **Low**: Smaller, faster models for simple tasks and high throughput
+- **Medium**: Balanced models for regular analysis tasks
+- **High**: Powerful models for complex code understanding and advanced analysis
+
+### Configuration
+AI integration is configured through environment variables:
+
+```bash
+# Main configuration
+AI_PROVIDER=anthropic     # Choose between: anthropic, openai, mistral
+
+# Provider API keys - at minimum, set the key for your preferred provider
+ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
+MISTRAL_API_KEY=your_mistral_api_key
+
+# Provider-specific model selection (optional)
+# Anthropic models
+ANTHROPIC_LOW_MODEL=claude-3-haiku-20240307
+ANTHROPIC_MEDIUM_MODEL=claude-3-sonnet-20240229
+ANTHROPIC_HIGH_MODEL=claude-3-opus-20240229
+
+# OpenAI models
+OPENAI_LOW_MODEL=gpt-3.5-turbo
+OPENAI_MEDIUM_MODEL=gpt-4
+OPENAI_HIGH_MODEL=gpt-4-turbo
+
+# Mistral models
+MISTRAL_LOW_MODEL=mistral-tiny
+MISTRAL_MEDIUM_MODEL=mistral-small
+MISTRAL_HIGH_MODEL=mistral-large
+```
+
+You can set these in a `.env` file in your project root, or in your system environment.
 
 ## License
 
