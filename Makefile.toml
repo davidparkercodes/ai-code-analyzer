@@ -21,24 +21,25 @@ description = "Build macOS release binary"
 condition = { platforms = ["mac"] }
 command = "cargo"
 args = ["build", "--release"]
-env = { "CARGO_BUILD_TARGET" = "x86_64-apple-darwin" }
 
 [tasks.build-release-macos-arm]
-description = "Build macOS ARM release binary"
+description = "Build macOS ARM release binary (when cross-compilation is set up)"
 condition = { platforms = ["mac"] }
 command = "cargo"
 args = ["build", "--release"]
-env = { "CARGO_BUILD_TARGET" = "aarch64-apple-darwin" }
+disabled = true
 
 [tasks.build-release-linux]
-description = "Build Linux release binary"
+description = "Build Linux release binary (when cross-compilation is set up)"
 command = "cargo"
-args = ["build", "--release", "--target", "x86_64-unknown-linux-gnu"]
+args = ["build", "--release"]
+disabled = true
 
 [tasks.build-release-windows]
-description = "Build Windows release binary"
+description = "Build Windows release binary (when cross-compilation is set up)"
 command = "cargo"
-args = ["build", "--release", "--target", "x86_64-pc-windows-msvc"]
+args = ["build", "--release"]
+disabled = true
 
 [tasks.test]
 description = "Run all tests"
