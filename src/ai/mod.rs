@@ -3,6 +3,7 @@ pub mod anthropic;
 pub mod openai;
 pub mod mistral;
 pub mod factory;
+pub mod prompts;
 
 pub use config::AiConfig;
 

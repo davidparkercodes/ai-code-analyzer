@@ -4,6 +4,7 @@ mod dependencies;
 mod style;
 mod describe;
 pub mod delete_comments;
+mod clean_code_analyze;
 
 use clap::{Parser, Subcommand};
 
@@ -134,6 +135,33 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Analyze code against Clean Code principles using AI
+    #[command(name = "clean-code-analyze")]
+    CleanCodeAnalyze {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
+        #[arg(short, long)]
+        output_path: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+        
+        /// AI model tier to use (low, medium, high)
+        #[arg(long = "ai-level", default_value = "medium")]
+        ai_level: String,
+        
+        /// Focus only on actionable, high-impact recommendations
+        #[arg(long)]
+        actionable_only: bool,
+        
+        /// Strictness level for analysis (low: minimal recommendations, medium: standard, high: comprehensive)
+        #[arg(long = "analyze-level", default_value = "medium")]
+        analyze_level: String,
+    },
 }
 
 pub async fn execute(cli: Cli) -> i32 {
@@ -149,5 +177,7 @@ pub async fn execute(cli: Cli) -> i32 {
             describe::execute(path, no_output, output_path, no_parallel).await,
         Commands::DeleteComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
             delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
+        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level, actionable_only, analyze_level } => 
+            clean_code_analyze::execute(path, output_path, no_parallel, ai_level, actionable_only, analyze_level).await,
     }
 }
