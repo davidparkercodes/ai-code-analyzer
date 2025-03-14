@@ -20,13 +20,13 @@ pub fn execute(
     force: bool,
     dry_run: bool
 ) -> i32 {
-    match execute_clean_comments_command(path, language, no_output, output_path, no_parallel, no_git, force, dry_run) {
+    match execute_delete_comments_command(path, language, no_output, output_path, no_parallel, no_git, force, dry_run) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
 }
 
-fn execute_clean_comments_command(
+fn execute_delete_comments_command(
     path: String, 
     language: String,
     no_output: bool,
@@ -60,7 +60,7 @@ fn execute_clean_comments_command(
         style::print_info("Running in dry-run mode. No files will be modified.");
     }
     
-    display_clean_header(&path, &language);
+    display_delete_header(&path, &language);
     log_parallel_status(parallel_enabled);
     
     let start_time = Instant::now();
@@ -70,9 +70,9 @@ fn execute_clean_comments_command(
         output_path.as_deref()
     };
     
-    let stats = clean_comments(&path, &language, effective_output_dir, dry_run)?;
+    let stats = delete_comments(&path, &language, effective_output_dir, dry_run)?;
     
-    display_clean_results(&stats, start_time);
+    display_delete_results(&stats, start_time);
     
     if !dry_run && no_git == false && stats.changed_files > 0 && effective_output_dir.is_none() {
         let is_git_repo = check_git_repository(&path_buf)?;
@@ -168,7 +168,7 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         .arg(path)
         .arg("commit")
         .arg("-m")
-        .arg("Cleaning up unnecessary comments")
+        .arg("Deleting unnecessary comments")
         .output()
         .map_err(AppError::Io)?;
     
@@ -202,18 +202,18 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
-fn display_clean_header(directory_path: &str, language: &str) {
-    style::print_header(&format!("Cleaning Comments from {} Files", language.to_uppercase()));
+fn display_delete_header(directory_path: &str, language: &str) {
+    style::print_header(&format!("Deleting Comments from {} Files", language.to_uppercase()));
     style::print_info(&format!("Analyzing {} files in directory: {}", language, directory_path));
 }
 
-struct CleanStats {
+struct DeleteStats {
     processed_files: usize,
     changed_files: usize,
     removed_comments: usize,
 }
 
-fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<CleanStats> {
+fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<DeleteStats> {
     let path = Path::new(directory_path);
     
     if !path.exists() {
@@ -223,7 +223,7 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         });
     }
     
-    let mut stats = CleanStats {
+    let mut stats = DeleteStats {
         processed_files: 0,
         changed_files: 0,
         removed_comments: 0,
@@ -269,8 +269,8 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
                 } else {
                     let base_path = crate::output::path::ensure_base_output_dir()?;
                     let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
-                    let clean_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "clean_comments")?;
-                    let final_dir = clean_comments_path.join(dir);
+                    let delete_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "delete_comments")?;
+                    let final_dir = delete_comments_path.join(dir);
                     
                     if !final_dir.exists() {
                         fs::create_dir_all(&final_dir).map_err(|e| {
@@ -296,7 +296,7 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
+                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -338,7 +338,7 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
+                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -382,7 +382,7 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
     Ok(stats)
 }
 
-fn clean_file_content(
+fn delete_file_content(
     content: &str, 
     comment_regex: &Regex, 
     ignore_regex: &Regex, 
@@ -441,14 +441,14 @@ fn clean_file_content(
     result
 }
 
-fn display_clean_results(stats: &CleanStats, start_time: Instant) {
+fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
     let elapsed = start_time.elapsed();
     
-    style::print_header("\nComment Cleaning Complete");
+    style::print_header("\nComment Deletion Complete");
     println!("Files processed: {}", stats.processed_files);
     println!("Files changed: {}", stats.changed_files);
     println!("Comments removed: {}", stats.removed_comments);
-    style::print_success(&format!("Cleaning completed in {:.2?}", elapsed));
+    style::print_success(&format!("Deletion completed in {:.2?}", elapsed));
 }
 
 /// Process a line of code, preserving string literals while removing end-of-line comments
