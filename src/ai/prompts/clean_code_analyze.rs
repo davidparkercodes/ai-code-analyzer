@@ -1,4 +1,3 @@
-
 /// Creates a complete AI prompt for clean code analysis with JSON output format
 pub fn create_clean_code_json_prompt(
     file_contents: &[(String, String)],
@@ -8,21 +7,33 @@ pub fn create_clean_code_json_prompt(
     analyze_level: &str,
 ) -> String {
     let all_code = concatenate_file_contents(file_contents);
-    
-    create_json_prompt(actionable_only, all_code, batch_number, file_count, analyze_level)
+
+    create_json_prompt(
+        actionable_only,
+        all_code,
+        batch_number,
+        file_count,
+        analyze_level,
+    )
 }
 
 /// Concatenates file paths and contents into a single string for the prompt
 fn concatenate_file_contents(file_contents: &[(String, String)]) -> String {
-    file_contents.iter()
+    file_contents
+        .iter()
         .map(|(path, content)| format!("\n\n// File: {}\n{}", path, content))
         .collect::<Vec<_>>()
         .join("")
 }
 
-
 /// Creates the appropriate type of JSON prompt based on the actionable_only flag
-fn create_json_prompt(actionable_only: bool, code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+fn create_json_prompt(
+    actionable_only: bool,
+    code: String,
+    batch_number: usize,
+    file_count: usize,
+    analyze_level: &str,
+) -> String {
     if actionable_only {
         create_actionable_json_prompt(code, batch_number, file_count, analyze_level)
     } else {
@@ -60,7 +71,6 @@ fn get_scoring_instructions(analyze_level: &str) -> String {
     }
 }
 
-
 /// Get strictness level instructions for actionable recommendations
 fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
     match analyze_level {
@@ -93,15 +103,12 @@ fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
     }.to_string()
 }
 
-
-
-
 /// Get strictness level instructions for full analysis
 fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
     match analyze_level {
         "low" => {
             "MINIMAL STRICTNESS MODE INSTRUCTIONS:\n\
-            1. Conduct a fair, balanced review without bias toward strengths or weaknesses\n\
+            1. Conduct a fair, balanced review without bias toward strongs or weaknesses\n\
             2. Only mention the most significant clean code violations, if any\n\
             3. It is entirely appropriate to note that well-structured code has no significant issues\n\
             4. Limit recommendations to only the most critical issues (1-2 at most)\n\
@@ -113,11 +120,11 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
             2. Consider even minor violations and stylistic improvements\n\
             3. Provide up to 4-5 recommendations per principle where appropriate\n\
             4. Look for subtle optimization opportunities and design pattern improvements\n\
-            5. Be specific and detailed in your analysis of both strengths and weaknesses"
+            5. Be specific and detailed in your analysis of both strongs and weaknesses"
         },
         _ => {
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
-            1. Be balanced in your analysis, covering both strengths and weaknesses\n\
+            1. Be balanced in your analysis, covering both strongs and weaknesses\n\
             2. Provide actionable recommendations only for significant issues (medium or high impact)\n\
             3. Limit recommendations to a maximum of 2-3 per principle\n\
             4. DO NOT force recommendations when they aren't needed - it's acceptable to praise good code\n\
@@ -125,9 +132,6 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
         }
     }.to_string()
 }
-
-
-
 
 /// Get JSON format instructions for output
 fn get_json_output_format() -> String {
@@ -142,7 +146,7 @@ fn get_json_output_format() -> String {
           \"recommendation\": \"Update function to follow single responsibility principle by splitting into two functions\"  // The actual recommendation\n\
         }\n\
       ],\n\
-      \"strengthPoints\": [        // Array of strings highlighting well-implemented clean code principles (OMIT when using --actionable-only)\n\
+      \"strongPoints\": [        // Array of strings highlighting well-implemented clean code principles (OMIT when using --actionable-only)\n\
         \"Good use of meaningful variable names throughout the file\",\n\
         \"Functions are small and focused on single responsibilities\"\n\
       ]\n\
@@ -152,7 +156,7 @@ fn get_json_output_format() -> String {
     1. file\n\
     2. score\n\
     3. actionableItems\n\
-    4. strengthPoints (OMIT when using --actionable-only)\n\
+    4. strongPoints (OMIT when using --actionable-only)\n\
     \n\
     CRITICAL REQUIREMENTS:\n\
     - Your response must ONLY contain a valid JSON array, with NO text before or after\n\
@@ -160,20 +164,25 @@ fn get_json_output_format() -> String {
     - For files with no issues, include an empty array for actionableItems\n\
     - Every recommendation MUST include location and recommendation fields\n\
     - Each recommendation should explain both WHAT to change and WHY it improves the code\n\
-    - When not in actionable-only mode, include 2-4 strength points that highlight well-implemented clean code principles\n\
-    - Each strength point should be specific, concise and directly related to clean code principles\n\
+    - When not in actionable-only mode, include 2-4 strong points that highlight well-implemented clean code principles\n\
+    - Each strong point should be specific, concise and directly related to clean code principles\n\
     - Follow the strictness level when determining what issues to include\n\
     - All recommendations should be concise but clear, focused on tangible improvements\n\
-    - Use camelCase for property names (actionableItems, strengthPoints)".to_string()
+    - Use camelCase for property names (actionableItems, strongPoints)".to_string()
 }
 
 /// Creates a prompt for actionable recommendations in JSON format
-pub fn create_actionable_json_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+pub fn create_actionable_json_prompt(
+    code: String,
+    batch_number: usize,
+    file_count: usize,
+    analyze_level: &str,
+) -> String {
     let base_prompt = create_shared_prompt_base();
     let strictness_instructions = get_actionable_strictness_instructions(analyze_level);
     let scoring_instructions = get_scoring_instructions(analyze_level);
     let json_format = get_json_output_format();
-    
+
     format!(
         "{}\n\n\
         ACTIONABLE RECOMMENDATIONS INSTRUCTIONS:\n\
@@ -193,12 +202,17 @@ pub fn create_actionable_json_prompt(code: String, batch_number: usize, file_cou
 }
 
 /// Creates a prompt for full analysis in JSON format
-pub fn create_full_json_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+pub fn create_full_json_prompt(
+    code: String,
+    batch_number: usize,
+    file_count: usize,
+    analyze_level: &str,
+) -> String {
     let base_prompt = create_shared_prompt_base();
     let strictness_instructions = get_analysis_strictness_instructions(analyze_level);
     let scoring_instructions = get_scoring_instructions(analyze_level);
     let json_format = get_json_output_format();
-    
+
     format!(
         "{}\n\n\
         ANALYSIS INSTRUCTIONS:\n\
