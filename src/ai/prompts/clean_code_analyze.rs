@@ -140,6 +140,7 @@ fn get_json_output_format() -> String {
     {\n\
       \"file\": \"filename.rs\",     // The filename from the code blocks\n\
       \"score\": 85,               // A number from 0-100 representing the clean code score\n\
+      \"scoreExplanation\": \"Brief explanation of the score, highlighting key factors that influenced it\",  // 1-2 sentence justification for the score\n\
       \"actionableItems\": [       // Array of objects containing structured recommendations\n\
         {\n\
           \"location\": \"function_name()\",  // The function, method, or code section where the issue is found\n\
@@ -155,12 +156,15 @@ fn get_json_output_format() -> String {
     IMPORTANT: The properties MUST appear IN THIS ORDER in the JSON output:\n\
     1. file\n\
     2. score\n\
-    3. actionableItems\n\
-    4. strongPoints (OMIT when using --actionable-only)\n\
+    3. scoreExplanation\n\
+    4. actionableItems\n\
+    5. strongPoints (OMIT when using --actionable-only)\n\
     \n\
     CRITICAL REQUIREMENTS:\n\
     - Your response must ONLY contain a valid JSON array, with NO text before or after\n\
     - Do not include any explanations, introductions, or markdown formatting\n\
+    - Always include a scoreExplanation that explains why the file received its score\n\
+    - The scoreExplanation should be 1-2 concise sentences highlighting the key factors\n\
     - For files with no issues, include an empty array for actionableItems\n\
     - Every recommendation MUST include location and recommendation fields\n\
     - Each recommendation should explain both WHAT to change and WHY it improves the code\n\
@@ -168,7 +172,7 @@ fn get_json_output_format() -> String {
     - Each strong point should be specific, concise and directly related to clean code principles\n\
     - Follow the strictness level when determining what issues to include\n\
     - All recommendations should be concise but clear, focused on tangible improvements\n\
-    - Use camelCase for property names (actionableItems, strongPoints)".to_string()
+    - Use camelCase for property names (scoreExplanation, actionableItems, strongPoints)".to_string()
 }
 
 /// Creates a prompt for actionable recommendations in JSON format

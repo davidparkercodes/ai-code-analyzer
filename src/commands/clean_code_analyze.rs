@@ -31,6 +31,8 @@ struct FileAnalysisResult {
     _ordering_field2: Option<()>,
     score: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
+    score_explanation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     _ordering_field3: Option<()>,
     actionable_items: Vec<ActionableItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,6 +52,8 @@ struct BatchAnalysisJson {
 struct OrderedAnalysisResult {
     file: String,
     score: u32,
+    #[serde(rename = "scoreExplanation", skip_serializing_if = "Option::is_none")]
+    score_explanation: Option<String>,
     #[serde(rename = "actionableItems")]
     actionable_items: Vec<OrderedActionableItem>,
     #[serde(rename = "strongPoints", skip_serializing_if = "Option::is_none")]
@@ -615,6 +619,11 @@ fn convert_to_ordered_results(
                 let file = map.get("file")?.as_str()?.to_string();
                 let score = map.get("score")?.as_u64()? as u32;
                 
+                // Extract score explanation
+                let score_explanation = map.get("scoreExplanation")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
+                
                 // Extract actionable items
                 let actionable_items = if let Some(serde_json::Value::Array(items)) = map.get("actionableItems") {
                     items.iter()
@@ -636,6 +645,7 @@ fn convert_to_ordered_results(
                 Some(OrderedAnalysisResult {
                     file,
                     score,
+                    score_explanation,
                     actionable_items,
                     strong_points,
                 })
