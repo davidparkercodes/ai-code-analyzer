@@ -33,6 +33,14 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
+        #[arg(short, long)]
+        output_path: Option<String>,
+        
         /// Disable parallel processing for large codebases
         #[arg(long)]
         no_parallel: bool,
@@ -131,7 +139,8 @@ pub enum Commands {
 pub async fn execute(cli: Cli) -> i32 {
     match cli.command {
         Commands::Run { path, no_parallel } => run::execute(path, no_parallel),
-        Commands::Metrics { path, no_parallel } => metrics::execute(path, no_parallel),
+        Commands::Metrics { path, no_output, output_path, no_parallel } => 
+            metrics::execute(path, no_output, output_path, no_parallel),
         Commands::Dependencies { path, no_output, output_path, no_parallel } => 
             dependencies::execute(path, no_output, output_path, no_parallel),
         Commands::Style { path, no_output, output_path, no_parallel } => 

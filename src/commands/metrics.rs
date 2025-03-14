@@ -4,15 +4,21 @@ use crate::metrics::reporter::MetricsReporter;
 use crate::output::style;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
+use std::path::Path;
 
-pub fn execute(path: String, no_parallel: bool) -> i32 {
-    match execute_metrics_command(path, no_parallel) {
+pub fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
+    match execute_metrics_command(path, no_output, output_path, no_parallel) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
 }
 
-fn execute_metrics_command(path: String, no_parallel: bool) -> AppResult<()> {
+fn execute_metrics_command(
+    path: String, 
+    no_output: bool, 
+    custom_output_path: Option<String>, 
+    no_parallel: bool
+) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     
     let collector = initialize_metrics_collector(parallel_enabled);
@@ -22,6 +28,15 @@ fn execute_metrics_command(path: String, no_parallel: bool) -> AppResult<()> {
 
     let metrics = collect_code_metrics(&collector, &path)?;
     display_metrics_results(&reporter, &metrics);
+    
+    if !no_output {
+        if let Some(output_path) = custom_output_path {
+            export_metrics(&reporter, &metrics, output_path)?;
+        } else {
+            let default_output = path.clone();
+            export_metrics(&reporter, &metrics, default_output)?;
+        }
+    }
     
     Ok(())
 }
@@ -45,4 +60,25 @@ fn display_metrics_results(
 ) {
     reporter.report(metrics);
     style::print_success("Metrics analysis completed successfully");
+}
+
+fn export_metrics(
+    reporter: &MetricsReporter,
+    metrics: &CodeMetrics,
+    output_path: String
+) -> AppResult<()> {
+    let path = if output_path.starts_with('/') {
+        Path::new(&output_path).to_path_buf()
+    } else {
+        crate::output::path::create_output_path("metrics", &output_path, "md")?
+    };
+    
+    reporter.export_metrics(metrics, &path)
+        .map_err(|error| AppError::FileSystem { 
+            path: path.clone(), 
+            message: format!("Error exporting metrics: {}", error) 
+        })?;
+    
+    style::print_success(&format!("Metrics exported to {}", path.display()));
+    Ok(())
 }
