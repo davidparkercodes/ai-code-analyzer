@@ -321,7 +321,13 @@ fn create_shared_prompt_base() -> String {
     - Avoid side effects in functions\n\
     - Don't repeat yourself (DRY)\n\
     - Maintain clear separation of concerns\n\
-    - Avoid unnecessary comments (code should be self-documenting)".to_string()
+    - Avoid unnecessary comments (code should be self-documenting)\n\n\
+    Regarding comments specifically:\n\
+    - Consider ALL inline comments that describe what the code is doing as unnecessary\n\
+    - Comments like '// Initialize variables', '// Create batches', '// Process each batch' are violations\n\
+    - Comments that explain 'what' instead of 'why' are unnecessary\n\
+    - Even simple section divider comments should be counted as violations\n\
+    - Good code should not need explanatory comments - the code itself should be clear enough".to_string()
 }
 
 fn create_recommendations_prompt(code: String, batch_number: usize, file_count: usize) -> String {
@@ -329,13 +335,15 @@ fn create_recommendations_prompt(code: String, batch_number: usize, file_count: 
     
     format!(
         "{}\n\n\
-        For each principle, ONLY identify violations and problematic code. Then provide actionable \
-        recommendations on how to improve the code to better follow Clean Code principles. \
-        Be constructive and specific. Include line numbers or function names in your recommendations \
-        whenever possible.\n\n\
-        IMPORTANT: If the code already follows good practices for a principle, you can state that \
-        no violations were found for that principle. It's perfectly acceptable to say the code looks \
-        good in some or all areas if that is the case.\n\n\
+        CRITICAL INSTRUCTIONS - READ CAREFULLY:\n\
+        1. You are in VIOLATIONS-ONLY MODE. Do NOT provide positive feedback or praise.\n\
+        2. For each principle, ONLY identify violations and problematic code - nothing else.\n\
+        3. DO NOT start sections with phrases like \"Generally Good\" or add checkmarks.\n\
+        4. DO NOT mention good practices or compliments about the code - focus exclusively on issues.\n\
+        5. NEVER write things like \"✅ Good\" or \"Excellent\" - ONLY report problems.\n\
+        6. DO conduct a THOROUGH check for ALL comments in the code and flag them as violations.\n\
+        7. Format your response as a list of violations and actionable recommendations ONLY.\n\
+        8. If there are no violations for a principle, simply state \"No violations found\" and move on.\n\n\
         Analyze these {} files (Batch #{}):\n{}",
         base_prompt,
         file_count,
@@ -349,13 +357,15 @@ fn create_full_analysis_prompt(code: String, batch_number: usize, file_count: us
     
     format!(
         "{}\n\n\
-        For each principle, indicate whether the code follows it, with specific examples of good practices \
-        or violations found. Then provide actionable recommendations on how to improve the code to better \
-        follow Clean Code principles. Be constructive and specific. Include line numbers or function names \
-        in your recommendations whenever possible.\n\n\
-        IMPORTANT: If the code already follows good practices, you don't need to force recommendations. \
-        You can simply acknowledge that the code is well-structured and follows Clean Code principles \
-        for those areas.\n\n\
+        ANALYSIS INSTRUCTIONS:\n\
+        1. For each principle, indicate whether the code follows it with specific examples.\n\
+        2. Be thorough and detailed in your analysis, covering both strengths and weaknesses.\n\
+        3. Provide actionable recommendations for areas that need improvement.\n\
+        4. Be particularly thorough in checking for unnecessary comments in the code.\n\
+        5. Include line numbers or function names in your recommendations whenever possible.\n\
+        6. If code follows good practices in an area, acknowledge this but don't force recommendations.\n\
+        7. Be honest in your assessment - don't mark something as good if it has clear issues.\n\
+        8. Pay special attention to examining ALL comments in the code and evaluate if they are truly necessary.\n\n\
         Analyze these {} files (Batch #{}):\n{}",
         base_prompt,
         file_count,
