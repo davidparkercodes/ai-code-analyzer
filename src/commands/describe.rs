@@ -5,7 +5,6 @@ use crate::ai::AiConfig;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
-use std::path::Path;
 
 pub async fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
     match execute_describe_command(path, no_output, output_path, no_parallel).await {
@@ -83,13 +82,7 @@ fn display_description_results(description: &str, start_time: Instant) {
 }
 
 fn export_description(content: &str, file_path: String) -> AppResult<()> {
-    let path = if file_path.starts_with('/') {
-        // Absolute path specified, use as-is
-        Path::new(&file_path).to_path_buf()
-    } else {
-        // Relative path or just filename, use structured output path
-        crate::output::path::create_output_path("describe", &file_path, "md")?
-    };
+    let path = crate::output::path::resolve_output_path("describe", &file_path, "md")?;
     
     std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 

@@ -13,6 +13,41 @@ pub fn create_output_path(command_name: &str, root_dir_name: &str, extension: &s
     Ok(command_dir.join(filename))
 }
 
+pub fn resolve_output_path(command_name: &str, path: &str, extension: &str) -> AppResult<PathBuf> {
+    let path_buf = Path::new(path).to_path_buf();
+    
+    if path.starts_with('/') && !path_buf.is_dir() {
+        // Absolute path and not a directory, use as-is
+        Ok(path_buf)
+    } else if path != "." && path_buf.is_dir() {
+        // It's a directory (but not current dir), create a filename inside it
+        let dir_name = path_buf.file_name()
+            .and_then(|name| name.to_str().map(String::from))
+            .unwrap_or_else(|| command_name.to_string());
+            
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+            
+        Ok(path_buf.join(format!("{}_{}_{}.{}", dir_name, command_name, timestamp, extension)))
+    } else {
+        // Current directory or a relative path or just name, use structured path
+        // But extract a meaningful name for the file
+        let dir_name = if path == "." {
+            // For current directory, get actual directory name
+            std::env::current_dir()
+                .ok()
+                .and_then(|path| path.file_name().and_then(|name| name.to_str().map(String::from)))
+                .unwrap_or_else(|| "current_dir".to_string())
+        } else {
+            path.to_string()
+        };
+        
+        create_output_path(command_name, &dir_name, extension)
+    }
+}
+
 pub fn ensure_base_output_dir() -> AppResult<PathBuf> {
     let output_dir = PathBuf::from("output");
     

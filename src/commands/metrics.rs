@@ -4,7 +4,6 @@ use crate::metrics::reporter::MetricsReporter;
 use crate::output::style;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
-use std::path::Path;
 
 pub fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
     match execute_metrics_command(path, no_output, output_path, no_parallel) {
@@ -67,11 +66,7 @@ fn export_metrics(
     metrics: &CodeMetrics,
     output_path: String
 ) -> AppResult<()> {
-    let path = if output_path.starts_with('/') {
-        Path::new(&output_path).to_path_buf()
-    } else {
-        crate::output::path::create_output_path("metrics", &output_path, "md")?
-    };
+    let path = crate::output::path::resolve_output_path("metrics", &output_path, "md")?;
     
     reporter.export_metrics(metrics, &path)
         .map_err(|error| AppError::FileSystem { 
