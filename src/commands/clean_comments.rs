@@ -238,7 +238,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         match output_dir {
             Some(dir) => {
                 if dir.starts_with('/') {
-                    // If absolute path, use it directly
                     let out_path = Path::new(&dir);
                     if !out_path.exists() {
                         fs::create_dir_all(out_path).map_err(|e| {
@@ -250,7 +249,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
                     }
                     Some(PathBuf::from(dir))
                 } else {
-                    // If relative path or just name, use structured path
                     let base_path = crate::output::path::ensure_base_output_dir()?;
                     let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
                     let clean_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "clean_comments")?;
