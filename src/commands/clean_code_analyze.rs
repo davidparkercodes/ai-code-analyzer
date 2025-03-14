@@ -1,7 +1,7 @@
 use crate::output::style;
 use crate::output::markdown::render_markdown;
 use crate::ai::{AiConfig, ModelTier, factory};
-use crate::ai::prompts::clean_code;
+use crate::ai::prompts::clean_code_analyze as prompt;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag};
 use crate::util::file_filter::get_all_source_files;
@@ -291,7 +291,7 @@ fn create_ai_prompt(
     file_count: usize,
     only_recommendations: bool
 ) -> String {
-    clean_code::create_clean_code_prompt(
+    prompt::create_clean_code_prompt(
         file_contents,
         batch_number,
         file_count,
