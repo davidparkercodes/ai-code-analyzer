@@ -17,7 +17,6 @@ use serde_json;
 #[serde(rename_all = "camelCase")]
 struct ActionableItem {
     location: String,
-    line_number: u32,
     recommendation: String,
 }
 
@@ -57,8 +56,6 @@ struct OrderedAnalysisResult {
 #[derive(Debug, Serialize)]
 struct OrderedActionableItem {
     location: String,
-    #[serde(rename = "lineNumber")]
-    line_number: u32,
     recommendation: String,
 }
 
@@ -212,8 +209,15 @@ fn scan_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBu
 }
 
 fn get_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBuf>> {
-    get_all_source_files(path, parallel_enabled)
-        .map_err(|e| map_scan_error(e))
+    let all_files = get_all_source_files(path, parallel_enabled)
+        .map_err(|e| map_scan_error(e))?;
+    
+    // Filter out known binary and cache files at scan time
+    let text_files: Vec<PathBuf> = all_files.into_iter()
+        .filter(|path| !should_skip_file(path))
+        .collect();
+    
+    Ok(text_files)
 }
 
 fn map_scan_error(error: std::io::Error) -> AppError {
@@ -263,6 +267,8 @@ async fn process_all_batches(
     model: Arc<dyn crate::ai::AiModel>,
     config: &CleanCodeConfig
 ) -> AppResult<()> {
+    let mut processed_batches = 0;
+    
     for batch in batches {
         let batch_config = BatchAnalysisConfig {
             batch,
@@ -271,9 +277,14 @@ async fn process_all_batches(
             analyze_level: config.analyze_level.clone(),
         };
         
-        let batch_result = analyze_code_batch(&batch_config).await?;
-        
-        process_batch_results(&batch_result, config)?;
+        if let Some(batch_result) = analyze_code_batch(&batch_config).await? {
+            process_batch_results(&batch_result, config)?;
+            processed_batches += 1;
+        }
+    }
+    
+    if processed_batches == 0 {
+        style::print_warning("No batches could be processed - no valid text files found");
     }
     
     Ok(())
@@ -319,7 +330,7 @@ fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
         .collect()
 }
 
-async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<BatchAnalysisResult> {
+async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Option<BatchAnalysisResult>> {
     let batch = config.batch;
     
     style::print_info(&format!("⏳ Analyzing batch {}/{} ({} files)", 
@@ -328,17 +339,26 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
     let start_time = Instant::now();
     
     let file_contents = collect_file_contents(batch.files)?;
+    let valid_file_count = file_contents.len();
+    
+    // Skip batch if no valid files
+    if valid_file_count == 0 {
+        style::print_warning(&format!("Skipping batch #{} - no valid files to analyze", batch.batch_number));
+        return Ok(None);
+    }
+    
+    style::print_info(&format!("🔄 Processing {} valid files in batch #{}", valid_file_count, batch.batch_number));
     
     let prompt = create_ai_prompt(
         &file_contents, 
         batch.batch_number, 
-        batch.files.len(), 
+        valid_file_count, 
         config.actionable_only,
         &config.analyze_level
     );
     
     style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
-        batch.batch_number, batch.files.len()));
+        batch.batch_number, valid_file_count));
     
     let analysis = config.model.generate_response(&prompt).await
         .map_err(|e| AppError::Ai(e))?;
@@ -346,29 +366,61 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
     let elapsed = start_time.elapsed();
     style::print_info(&format!("⌛ AI analysis completed in {:.2?}", elapsed));
     
-    Ok(BatchAnalysisResult {
+    Ok(Some(BatchAnalysisResult {
         content: analysis,
         batch_number: batch.batch_number,
-    })
+    }))
 }
 
 fn collect_file_contents(files: &[PathBuf]) -> AppResult<Vec<(String, String)>> {
-    files.iter()
-         .map(|file_path| read_file_with_path(file_path))
-         .collect()
+    let mut valid_files = Vec::new();
+    
+    for file_path in files.iter() {
+        // Skip binary files and cache directories by default
+        if should_skip_file(file_path) {
+            style::print_info(&format!("Skipping binary/cache file: {}", file_path.display()));
+            continue;
+        }
+        
+        match read_file_with_path(file_path) {
+            Ok(file_content) => valid_files.push(file_content),
+            Err(error) => {
+                // Log the error but continue with other files
+                style::print_warning(&format!("Skipping file: {}", error));
+            }
+        }
+    }
+    
+    // Return an empty collection instead of an error if no valid files
+    // This allows the batch to be skipped gracefully
+    Ok(valid_files)
 }
 
-fn read_file_with_path(file_path: &PathBuf) -> AppResult<(String, String)> {
+fn should_skip_file(file_path: &PathBuf) -> bool {
+    let path_str = file_path.to_string_lossy();
+    
+    // Skip __pycache__ directory files
+    if path_str.contains("__pycache__") {
+        return true;
+    }
+    
+    // Skip common binary file extensions
+    let is_binary = [
+        ".pyc", ".exe", ".dll", ".so", ".dylib", 
+        ".bin", ".dat", ".jpg", ".jpeg", ".png", 
+        ".gif", ".class", ".jar", ".o", ".a"
+    ].iter().any(|ext| path_str.ends_with(ext));
+    
+    is_binary
+}
+
+fn read_file_with_path(file_path: &PathBuf) -> Result<(String, String), String> {
     let display_path = file_path.display().to_string();
     
     match fs::read_to_string(file_path) {
         Ok(content) => Ok((display_path, content)),
-        Err(e) => Err(map_io_error(e, &display_path))
+        Err(e) => Err(format!("Error reading file {}: {}", display_path, e))
     }
-}
-
-fn map_io_error(error: std::io::Error, file_path: &str) -> AppError {
-    AppError::Analysis(format!("Error reading file {}: {}", file_path, error))
 }
 
 fn create_ai_prompt(
@@ -475,10 +527,6 @@ fn export_batch_analysis(
                                             .cloned()
                                             .unwrap_or(serde_json::Value::String("unknown".to_string())));
                                             
-                                        ordered_item.insert("lineNumber".to_string(), item_map.get("lineNumber")
-                                            .cloned()
-                                            .unwrap_or(serde_json::Value::Number(serde_json::Number::from(0))));
-                                            
                                         ordered_item.insert("recommendation".to_string(), item_map.get("recommendation")
                                             .cloned()
                                             .unwrap_or(serde_json::Value::String("".to_string())));
@@ -516,12 +564,10 @@ fn export_batch_analysis(
                             items.iter().filter_map(|item| {
                                 if let serde_json::Value::Object(item_map) = item {
                                     let location = item_map.get("location")?.as_str()?.to_string();
-                                    let line_number = item_map.get("lineNumber")?.as_u64()? as u32;
                                     let recommendation = item_map.get("recommendation")?.as_str()?.to_string();
                                     
                                     Some(OrderedActionableItem {
                                         location,
-                                        line_number,
                                         recommendation,
                                     })
                                 } else {

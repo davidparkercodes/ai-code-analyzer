@@ -139,7 +139,6 @@ fn get_json_output_format() -> String {
       \"actionableItems\": [       // Array of objects containing structured recommendations\n\
         {\n\
           \"location\": \"function_name()\",  // The function, method, or code section where the issue is found\n\
-          \"lineNumber\": 42,                // The approximate line number where the issue occurs\n\
           \"recommendation\": \"Update function to follow single responsibility principle by splitting into two functions\"  // The actual recommendation\n\
         }\n\
       ]\n\
@@ -154,12 +153,11 @@ fn get_json_output_format() -> String {
     - Your response must ONLY contain a valid JSON array, with NO text before or after\n\
     - Do not include any explanations, introductions, or markdown formatting\n\
     - For files with no issues, include an empty array for actionableItems\n\
-    - Every recommendation MUST include location, lineNumber, and recommendation fields\n\
-    - If you can't determine the exact line number, provide your best estimate\n\
+    - Every recommendation MUST include location and recommendation fields\n\
     - Each recommendation should explain both WHAT to change and WHY it improves the code\n\
     - Follow the strictness level when determining what issues to include\n\
     - All recommendations should be concise but clear, focused on tangible improvements\n\
-    - Use camelCase for property names (actionableItems, lineNumber)".to_string()
+    - Use camelCase for property names (actionableItems)".to_string()
 }
 
 /// Creates a prompt for actionable recommendations in JSON format
