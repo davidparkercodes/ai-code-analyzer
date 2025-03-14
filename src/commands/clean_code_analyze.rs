@@ -536,181 +536,66 @@ fn log_analyze_level(level: &AnalyzeLevel) {
     ));
 }
 
-fn export_batch_analysis(
-    content: &str,
-    base_path: &str,
-    batch_number: usize,
-    model_tier: &ModelTier,
+/// Parse JSON from string into a serde_json::Value
+fn parse_analysis_json(content: &str) -> Result<serde_json::Value, String> {
+    serde_json::from_str(content)
+        .map_err(|e| format\!("Failed to parse JSON response: {}", e))
+}
+
+/// Create ordered actionable items from unordered JSON
+fn create_ordered_actionable_item(item_map: &serde_json::Map<String, serde_json::Value>) -> Option<OrderedActionableItem> {
+    let location = item_map.get("location")?.as_str()?.to_string();
+    let recommendation = item_map.get("recommendation")?.as_str()?.to_string();
+    
+    Some(OrderedActionableItem {
+        location,
+        recommendation,
+    })
+}
+
+/// Extract strength points from JSON if available
+fn extract_strength_points(
+    map: &serde_json::Map<String, serde_json::Value>,
     actionable_only: bool,
-    analyze_level: &AnalyzeLevel,
-) -> AppResult<()> {
-    match serde_json::from_str::<serde_json::Value>(content) {
-        Ok(json_value) => {
-            let path = generate_output_path(
-                base_path,
-                batch_number,
-                model_tier,
-                actionable_only,
-                analyze_level,
-            )?;
+) -> Option<Vec<String>> {
+    if actionable_only {
+        return None;
+    }
+    
+    let strengths = map.get("strengthPoints")?;
+    if let serde_json::Value::Array(strengths_array) = strengths {
+        let points: Vec<String> = strengths_array.iter()
+            .filter_map(|s| s.as_str().map(|str| str.to_string()))
+            .collect();
+        
+        if points.is_empty() {
+            None
+        } else {
+            Some(points)
+        }
+    } else {
+        None
+    }
+}
 
-            let file_count = if let serde_json::Value::Array(ref array) = json_value {
-                array.len()
-            } else {
-                0
-            };
-
-            let ordered_json = if let serde_json::Value::Array(array) = json_value {
-                let ordered_array = array
-                    .iter()
-                    .map(|item| {
-                        if let serde_json::Value::Object(map) = item {
-                            let mut ordered_map = serde_json::Map::new();
-
-                            ordered_map.insert(
-                                "file".to_string(),
-                                map.get("file")
-                                    .cloned()
-                                    .unwrap_or(serde_json::Value::String("unknown".to_string())),
-                            );
-
-                            ordered_map.insert(
-                                "score".to_string(),
-                                map.get("score")
-                                    .cloned()
-                                    .unwrap_or(serde_json::Value::Number(
-                                        serde_json::Number::from(0),
-                                    )),
-                            );
-
-                            if let Some(items) = map.get("actionableItems") {
-                                if let serde_json::Value::Array(items_array) = items {
-                                    let ordered_items = items_array
-                                        .iter()
-                                        .map(|item| {
-                                            if let serde_json::Value::Object(item_map) = item {
-                                                let mut ordered_item = serde_json::Map::new();
-
-                                                ordered_item.insert(
-                                                    "location".to_string(),
-                                                    item_map.get("location").cloned().unwrap_or(
-                                                        serde_json::Value::String(
-                                                            "unknown".to_string(),
-                                                        ),
-                                                    ),
-                                                );
-
-                                                ordered_item.insert(
-                                                    "recommendation".to_string(),
-                                                    item_map
-                                                        .get("recommendation")
-                                                        .cloned()
-                                                        .unwrap_or(serde_json::Value::String(
-                                                            "".to_string(),
-                                                        )),
-                                                );
-
-                                                serde_json::Value::Object(ordered_item)
-                                            } else {
-                                                item.clone()
-                                            }
-                                        })
-                                        .collect();
-
-                                    ordered_map.insert(
-                                        "actionableItems".to_string(),
-                                        serde_json::Value::Array(ordered_items),
-                                    );
-                                } else {
-                                    ordered_map
-                                        .insert("actionableItems".to_string(), items.clone());
-                                }
-                            }
-
-                            // Add strong points if they exist and we're not in actionable-only mode
-                            if !actionable_only {
-                                if let Some(strongs) = map.get("strongPoints") {
-                                    ordered_map.insert("strongPoints".to_string(), strongs.clone());
-                                }
-                            }
-
-                            serde_json::Value::Object(ordered_map)
-                        } else {
-                            item.clone()
-                        }
-                    })
-                    .collect();
-
-                serde_json::Value::Array(ordered_array)
-            } else {
-                json_value
-            };
-
-            let ordered_results: Vec<OrderedAnalysisResult> =
-                if let serde_json::Value::Array(array) = &ordered_json {
-                    array
-                        .iter()
+/// Convert JSON array to ordered analysis results
+fn convert_to_ordered_results(
+    json_array: &[serde_json::Value],
+    actionable_only: bool,
+) -> Vec<OrderedAnalysisResult> {
+    json_array.iter()
+        .filter_map(|item| {
+            if let serde_json::Value::Object(map) = item {
+                // Extract file path and score
+                let file = map.get("file")?.as_str()?.to_string();
+                let score = map.get("score")?.as_u64()? as u32;
+                
+                // Extract actionable items
+                let actionable_items = if let Some(serde_json::Value::Array(items)) = map.get("actionableItems") {
+                    items.iter()
                         .filter_map(|item| {
-                            if let serde_json::Value::Object(map) = item {
-                                let file = map.get("file")?.as_str()?.to_string();
-                                let score = map.get("score")?.as_u64()? as u32;
-
-                                let actionable_items =
-                                    if let Some(serde_json::Value::Array(items)) =
-                                        map.get("actionableItems")
-                                    {
-                                        items
-                                            .iter()
-                                            .filter_map(|item| {
-                                                if let serde_json::Value::Object(item_map) = item {
-                                                    let location = item_map
-                                                        .get("location")?
-                                                        .as_str()?
-                                                        .to_string();
-                                                    let recommendation = item_map
-                                                        .get("recommendation")?
-                                                        .as_str()?
-                                                        .to_string();
-
-                                                    Some(OrderedActionableItem {
-                                                        location,
-                                                        recommendation,
-                                                    })
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .collect()
-                                    } else {
-                                        Vec::new()
-                                    };
-
-                                let strong_points = if !actionable_only {
-                                    if let Some(serde_json::Value::Array(strongs)) =
-                                        map.get("strongPoints")
-                                    {
-                                        let points: Vec<String> = strongs
-                                            .iter()
-                                            .filter_map(|s| s.as_str().map(|str| str.to_string()))
-                                            .collect();
-                                        if !points.is_empty() {
-                                            Some(points)
-                                        } else {
-                                            None
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                };
-
-                                Some(OrderedAnalysisResult {
-                                    file,
-                                    score,
-                                    actionable_items,
-                                    strong_points,
-                                })
+                            if let serde_json::Value::Object(item_map) = item {
+                                create_ordered_actionable_item(item_map)
                             } else {
                                 None
                             }
@@ -719,24 +604,74 @@ fn export_batch_analysis(
                 } else {
                     Vec::new()
                 };
+                
+                // Extract strength points
+                let strength_points = extract_strength_points(map, actionable_only);
+                
+                Some(OrderedAnalysisResult {
+                    file,
+                    score,
+                    actionable_items,
+                    strength_points,
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
-            let formatted_content = serde_json::to_string_pretty(&ordered_results)
-                .unwrap_or_else(|_| content.to_string());
-
-            write_analysis_to_file(&path, &formatted_content)?;
-
-            log_export_success(batch_number, file_count, &path);
-
-            Ok(())
+/// Ensure consistent field ordering in JSON output
+fn export_batch_analysis(
+    content: &str,
+    base_path: &str,
+    batch_number: usize,
+    model_tier: &ModelTier,
+    actionable_only: bool,
+    analyze_level: &AnalyzeLevel,
+) -> AppResult<()> {
+    // Parse JSON content
+    let json_value = match parse_analysis_json(content) {
+        Ok(value) => value,
+        Err(message) => {
+            style::print_warning(&format\!("Invalid JSON response: {}", message));
+            return Err(AppError::Analysis(message));
         }
-        Err(e) => {
-            style::print_warning(&format!("Invalid JSON response: {}", e));
-            Err(AppError::Analysis(format!(
-                "Failed to parse JSON response: {}",
-                e
-            )))
-        }
-    }
+    };
+    
+    // Generate output path
+    let path = generate_output_path(
+        base_path,
+        batch_number,
+        model_tier,
+        actionable_only,
+        analyze_level,
+    )?;
+    
+    // Count files in analysis
+    let file_count = if let serde_json::Value::Array(ref array) = json_value {
+        array.len()
+    } else {
+        0
+    };
+    
+    // Convert to ordered results
+    let ordered_results = if let serde_json::Value::Array(array) = json_value {
+        convert_to_ordered_results(&array, actionable_only)
+    } else {
+        Vec::new()
+    };
+    
+    // Format and write to file
+    let formatted_content = serde_json::to_string_pretty(&ordered_results)
+        .unwrap_or_else(|_| content.to_string());
+    
+    write_analysis_to_file(&path, &formatted_content)?;
+    
+    // Log success
+    log_export_success(batch_number, file_count, &path);
+    
+    Ok(())
 }
 
 fn generate_output_path(
