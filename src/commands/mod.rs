@@ -3,6 +3,7 @@ mod metrics;
 mod dependencies;
 mod style;
 mod describe;
+pub mod clean_comments;
 
 use clap::{Parser, Subcommand};
 
@@ -78,6 +79,37 @@ pub enum Commands {
         #[arg(long)]
         no_parallel: bool,
     },
+    /// Clean comments from source code files
+    #[command(name = "clean-comments")]
+    CleanComments {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Programming language to clean comments from (currently only 'rust' is supported)
+        #[arg(short, long, required = true)]
+        language: String,
+        
+        /// Output directory for cleaned files (optional, modifies files in-place if not provided)
+        #[arg(short, long)]
+        output: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+        
+        /// Skip Git operations (checking for repo, adding files, committing)
+        #[arg(long)]
+        no_git: bool,
+        
+        /// Force removing comments without asking for confirmation in non-git directories
+        #[arg(long)]
+        force: bool,
+        
+        /// Show what would be removed without making changes
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 pub async fn execute(cli: Cli) -> i32 {
@@ -87,5 +119,7 @@ pub async fn execute(cli: Cli) -> i32 {
         Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
         Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
         Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
+        Commands::CleanComments { path, language, output, no_parallel, no_git, force, dry_run } => 
+            clean_comments::execute(path, language, output, no_parallel, no_git, force, dry_run),
     }
 }

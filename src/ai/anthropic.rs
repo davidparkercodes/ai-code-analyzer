@@ -50,7 +50,6 @@ impl AnthropicProvider {
             .build()
             .unwrap_or_default();
             
-        // Validate that we have an API key
         let _api_key = config.get_api_key(AiVendor::Anthropic)?;
             
         Ok(Self {
@@ -119,7 +118,6 @@ impl AiModel for AnthropicProvider {
         
         let response_data: AnthropicResponse = response.json().await?;
         
-        // Extract the text from the first content item
         if let Some(content) = response_data.content.first() {
             Ok(content.text.clone())
         } else {

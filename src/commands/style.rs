@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
     match execute_style_command(path, output, no_parallel) {
-        Ok(_) => 0,  // Success exit code
+        Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
 }

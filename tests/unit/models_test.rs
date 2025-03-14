@@ -40,7 +40,6 @@ fn test_add_language_metrics() {
     assert_eq!(metrics.comment_lines, 200);
     assert_eq!(metrics.by_language.len(), 1);
 
-    // Add more metrics for same language
     let mut lang_metrics2 = LanguageMetrics::new("Rust".to_string());
     lang_metrics2.files = 5;
     lang_metrics2.lines_of_code = 300;
@@ -49,17 +48,15 @@ fn test_add_language_metrics() {
 
     metrics.add_language_metrics(lang_metrics2, "/test/file2.rs");
 
-    assert_eq!(metrics.lines_of_code, 800); // 500 + 300
-    assert_eq!(metrics.blank_lines, 150); // 100 + 50
-    assert_eq!(metrics.comment_lines, 300); // 200 + 100
+    assert_eq!(metrics.lines_of_code, 800);
+    assert_eq!(metrics.blank_lines, 150);
+    assert_eq!(metrics.comment_lines, 300);
     assert_eq!(metrics.by_language.len(), 1);
 
-    // The Rust entry should be updated
     let rust_metrics = metrics.by_language.get("Rust").unwrap();
-    assert_eq!(rust_metrics.files, 15); // 10 + 5
-    assert_eq!(rust_metrics.lines_of_code, 800); // 500 + 300
+    assert_eq!(rust_metrics.files, 15);
+    assert_eq!(rust_metrics.lines_of_code, 800);
 
-    // Add metrics for another language
     let mut js_metrics = LanguageMetrics::new("JavaScript".to_string());
     js_metrics.files = 8;
     js_metrics.lines_of_code = 400;
@@ -68,8 +65,8 @@ fn test_add_language_metrics() {
 
     metrics.add_language_metrics(js_metrics, "/test/script.js");
 
-    assert_eq!(metrics.lines_of_code, 1200); // 800 + 400
-    assert_eq!(metrics.blank_lines, 230); // 150 + 80
-    assert_eq!(metrics.comment_lines, 420); // 300 + 120
+    assert_eq!(metrics.lines_of_code, 1200);
+    assert_eq!(metrics.blank_lines, 230);
+    assert_eq!(metrics.comment_lines, 420);
     assert_eq!(metrics.by_language.len(), 2);
 }

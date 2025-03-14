@@ -21,7 +21,6 @@ impl AiModel for MockAiModel {
     }
     
     async fn generate_response(&self, prompt: &str) -> Result<String, AiError> {
-        // Just return a simplified response based on the prompt
         let prompt_length = prompt.len();
         
         Ok(format!(
@@ -70,14 +69,12 @@ pub fn create_ai_model(
     config: AiConfig, 
     tier: ModelTier
 ) -> Result<Arc<dyn AiModel>, AiError> {
-    // Create the appropriate model based on the configuration
     match config.vendor {
         AiVendor::Anthropic => {
             if config.anthropic_api_key.is_some() {
                 let model = AnthropicProvider::new(config, tier)?;
                 Ok(Arc::new(model))
             } else {
-                // If no API key, use mock model
                 Ok(Arc::new(MockAiModel))
             }
         },
@@ -86,7 +83,6 @@ pub fn create_ai_model(
                 let model = OpenAiProvider::new(config, tier)?;
                 Ok(Arc::new(model))
             } else {
-                // If no API key, use mock model
                 Ok(Arc::new(MockAiModel))
             }
         },
@@ -95,7 +91,6 @@ pub fn create_ai_model(
                 let model = MistralProvider::new(config, tier)?;
                 Ok(Arc::new(model))
             } else {
-                // If no API key, use mock model
                 Ok(Arc::new(MockAiModel))
             }
         },

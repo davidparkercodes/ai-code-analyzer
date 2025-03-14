@@ -5,10 +5,8 @@ use code_analyzer::ai::{AiConfig, AiVendor, ModelTier};
 fn test_default_config() {
     let config = AiConfig::default();
     
-    // Check default values
     assert_eq!(config.vendor, AiVendor::Anthropic);
     
-    // Check default model names
     assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::Low), "claude-3-haiku-20240307");
     assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::Medium), "claude-3-sonnet-20240229");
     assert_eq!(config.get_model_name(AiVendor::Anthropic, ModelTier::High), "claude-3-opus-20240229");
@@ -28,12 +26,10 @@ fn test_model_tier_from_str() {
     assert_eq!("medium".parse::<ModelTier>().unwrap(), ModelTier::Medium);
     assert_eq!("high".parse::<ModelTier>().unwrap(), ModelTier::High);
     
-    // Case insensitive
     assert_eq!("LOW".parse::<ModelTier>().unwrap(), ModelTier::Low);
     assert_eq!("MEDIUM".parse::<ModelTier>().unwrap(), ModelTier::Medium);
     assert_eq!("HIGH".parse::<ModelTier>().unwrap(), ModelTier::High);
     
-    // Invalid tier
     assert!("invalid".parse::<ModelTier>().is_err());
 }
 
@@ -43,12 +39,10 @@ fn test_vendor_from_str() {
     assert_eq!("openai".parse::<AiVendor>().unwrap(), AiVendor::OpenAi);
     assert_eq!("mistral".parse::<AiVendor>().unwrap(), AiVendor::Mistral);
     
-    // Case insensitive
     assert_eq!("ANTHROPIC".parse::<AiVendor>().unwrap(), AiVendor::Anthropic);
     assert_eq!("OPENAI".parse::<AiVendor>().unwrap(), AiVendor::OpenAi);
     assert_eq!("MISTRAL".parse::<AiVendor>().unwrap(), AiVendor::Mistral);
     
-    // Invalid vendor
     assert!("invalid".parse::<AiVendor>().is_err());
 }
 
@@ -56,17 +50,14 @@ fn test_vendor_from_str() {
 fn test_api_keys() {
     let mut config = AiConfig::default();
     
-    // Default has no API keys
     assert!(config.anthropic_api_key.is_none());
     assert!(config.openai_api_key.is_none());
     assert!(config.mistral_api_key.is_none());
     
-    // Set API keys
     config.anthropic_api_key = Some("test-anthropic-key".to_string());
     config.openai_api_key = Some("test-openai-key".to_string());
     config.mistral_api_key = Some("test-mistral-key".to_string());
     
-    // Test get_api_key method
     assert_eq!(config.get_api_key(AiVendor::Anthropic).unwrap(), "test-anthropic-key");
     assert_eq!(config.get_api_key(AiVendor::OpenAi).unwrap(), "test-openai-key");
     assert_eq!(config.get_api_key(AiVendor::Mistral).unwrap(), "test-mistral-key");
@@ -74,35 +65,28 @@ fn test_api_keys() {
 
 #[test]
 fn test_env_config() {
-    // This test depends on environment variables, so we need to be careful
-    // about cleanup to avoid affecting other tests
     
-    // Save original values
     let original_provider = env::var("AI_PROVIDER").ok();
     let original_anthropic_key = env::var("ANTHROPIC_API_KEY").ok();
     let original_openai_key = env::var("OPENAI_API_KEY").ok();
     let original_mistral_key = env::var("MISTRAL_API_KEY").ok();
     
-    // Set test values - using unsafe blocks for env operations
     unsafe {
         env::set_var("AI_PROVIDER", "openai");
         env::set_var("OPENAI_API_KEY", "test-openai-key");
         env::set_var("OPENAI_HIGH_MODEL", "custom-gpt-model");
     }
     
-    // Test config loading
     let config = AiConfig::from_env().unwrap();
     assert_eq!(config.vendor, AiVendor::OpenAi);
     assert_eq!(config.openai_api_key.as_ref().unwrap(), "test-openai-key");
     assert_eq!(config.get_model_name(AiVendor::OpenAi, ModelTier::High), "custom-gpt-model");
     
-    // Clean up
     unsafe {
         env::remove_var("AI_PROVIDER");
         env::remove_var("OPENAI_API_KEY");
         env::remove_var("OPENAI_HIGH_MODEL");
     
-        // Restore original values if they existed
         if let Some(val) = original_provider {
             env::set_var("AI_PROVIDER", val);
         }

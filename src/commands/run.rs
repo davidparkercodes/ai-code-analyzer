@@ -4,7 +4,7 @@ use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelPr
 
 pub fn execute(path: String, no_parallel: bool) -> i32 {
     match execute_run_command(path, no_parallel) {
-        Ok(_) => 0,  // Success exit code
+        Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
 }

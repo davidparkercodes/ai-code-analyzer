@@ -49,11 +49,9 @@ impl RustHighlighter {
             let c = chars[i];
             
             if self.handle_string_literal(c, &chars, i) {
-                // Character was handled by string literal logic
             } else if self.handle_char_literal(c) {
-                // Character was handled by char literal logic
             } else if self.handle_comment(c, &chars, i) {
-                i += 1; // Skip the second '/' in comment
+                i += 1;
             } else {
                 self.handle_regular_character(c);
             }
@@ -142,12 +140,10 @@ impl RustHighlighter {
     fn handle_regular_character(&mut self, c: char) {
         self.current_part.push(c);
         
-        // If we're in a string, char or comment, just continue collecting
         if self.in_string || self.in_char || self.in_comment {
             return;
         }
         
-        // Check for keywords and tokens
         self.handle_token_boundary(c);
     }
     

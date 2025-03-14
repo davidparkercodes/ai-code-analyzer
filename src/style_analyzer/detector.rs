@@ -1,4 +1,3 @@
-// FileAnalyzer import removed as it's not used
 use crate::metrics::language::LanguageDetector;
 use crate::style_analyzer::pattern::{
     IndentationStyle, NamingConvention, StylePattern, StylePatternCollection, StyleRule,
@@ -37,7 +36,6 @@ impl StyleDetector {
         let patterns = Arc::new(Mutex::new(StylePatternCollection::new()));
         let language_files = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
 
-        // Create walker to traverse the directory
         let walker = WalkBuilder::new(path)
             .hidden(false)
             .git_ignore(true)
@@ -53,7 +51,6 @@ impl StyleDetector {
             })
             .build();
 
-        // Collect all file entries
         let entries: Vec<_> = walker
             .filter_map(|result| {
                 match result {
@@ -63,11 +60,9 @@ impl StyleDetector {
             })
             .collect();
 
-        // Process files in parallel
         entries.par_iter().for_each(|entry| {
             let file_path = entry.path();
             
-            // Detect language
             let extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
             let file_name = file_path.file_name().and_then(|name| name.to_str()).unwrap_or("");
             
@@ -77,54 +72,43 @@ impl StyleDetector {
                 self.language_detector.detect_language(extension)
             };
             
-            // Count language files
             {
                 let mut lang_files = language_files.lock().unwrap();
                 *lang_files.entry(language.clone()).or_insert(0) += 1;
             }
             
-            // Read file content
             if let Ok(content) = fs::read_to_string(file_path) {
                 self.analyze_file_style(&content, &language, file_path.to_string_lossy().as_ref(), patterns.clone());
             }
         });
 
-        // Create the style report
         let pattern_collection = patterns.lock().unwrap();
         let languages_map = language_files.lock().unwrap();
         
         let mut report = StyleReport::new();
         
-        // Process each language
         for (language, file_count) in languages_map.iter() {
             report.add_language_stats(language, *file_count);
             
-            // Add patterns for this language
             for pattern in pattern_collection.get_patterns(language) {
                 report.add_pattern(pattern.clone());
             }
         }
         
-        // Generate dominant style guide
         report.generate_style_guide();
         
         Ok(report)
     }
 
     fn analyze_file_style(&self, content: &str, language: &str, file_path: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
-        // Detect indentation style
         self.detect_indentation_style(content, language, patterns.clone());
         
-        // Detect naming conventions
         self.detect_naming_conventions(content, language, file_path, patterns.clone());
         
-        // Detect line length metrics
         self.detect_line_length(content, language, patterns.clone());
         
-        // Detect comment density
         self.detect_comment_density(content, language, patterns.clone());
         
-        // Detect function size
         self.detect_function_size(content, language, patterns);
     }
 
@@ -141,7 +125,6 @@ impl StyleDetector {
                 continue;
             }
             
-            // Count leading whitespace
             let mut spaces = 0;
             let mut tabs = 0;
             
@@ -166,13 +149,10 @@ impl StyleDetector {
         
         if total_indent_lines > 0 {
             let style_rule = if tab_count > 0 && space_indent_counts.values().sum::<usize>() > 0 {
-                // Mixed tabs and spaces
                 StyleRule::IndentationStyle(IndentationStyle::Mixed)
             } else if tab_count > 0 {
-                // Tabs only
                 StyleRule::IndentationStyle(IndentationStyle::Tabs)
             } else {
-                // Find most common space count
                 let mut max_count = 0;
                 let mut most_common_space = 0;
                 
@@ -204,7 +184,6 @@ impl StyleDetector {
         }
     }
 
-    // Function to detect comment density (comments to code ratio)
     fn detect_comment_density(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
         let lines: Vec<&str> = content.lines().collect();
         
@@ -212,11 +191,9 @@ impl StyleDetector {
             return;
         }
         
-        // Count comment lines and code lines based on language-specific patterns
         let mut comment_lines = 0;
         let mut code_lines = 0;
         
-        // Simple comment detection by language
         let (single_line_comment, multi_line_start, multi_line_end) = match language.to_lowercase().as_str() {
             "rust" => ("//", "/*", "*/"),
             "javascript" | "typescript" | "java" | "c" | "cpp" | "c++" | "csharp" | "c#" => ("//", "/*", "*/"),
@@ -225,7 +202,7 @@ impl StyleDetector {
             "html" | "xml" => ("", "<!--", "-->"),
             "css" | "scss" | "sass" => ("//", "/*", "*/"),
             "shell" | "bash" => ("#", "", ""),
-            _ => ("//", "/*", "*/"), // Default to C-style comments
+            _ => ("//", "/*", "*/"),
         };
         
         let mut in_multi_line_comment = false;
@@ -234,7 +211,7 @@ impl StyleDetector {
             let trimmed = line.trim();
             
             if trimmed.is_empty() {
-                continue; // Skip empty lines
+                continue;
             }
             
             if in_multi_line_comment {
@@ -254,7 +231,6 @@ impl StyleDetector {
             }
         }
         
-        // Calculate comment density as percentage
         let total_lines = comment_lines + code_lines;
         if total_lines > 0 {
             let density = (comment_lines as f64 * 100.0 / total_lines as f64) as usize;
@@ -265,7 +241,6 @@ impl StyleDetector {
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(None);
             
-            // Add examples of comments
             let mut comment_examples = Vec::new();
             in_multi_line_comment = false;
             
@@ -295,7 +270,6 @@ impl StyleDetector {
         }
     }
     
-    // Function to detect function size
     fn detect_function_size(&self, content: &str, language: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
         let lines: Vec<&str> = content.lines().collect();
         
@@ -303,16 +277,14 @@ impl StyleDetector {
             return;
         }
         
-        // Simplified function detection based on language
         let (fn_keyword, fn_end) = match language.to_lowercase().as_str() {
             "rust" => (Some("fn "), Some("}")),
             "javascript" | "typescript" => (Some("function "), Some("}")),
             "python" => (Some("def "), None),
-            "java" | "c++" | "c#" => (None, Some("}")), // Will use bracket counting instead
-            _ => (Some("fn "), Some("}")), // Default to Rust-like
+            "java" | "c++" | "c#" => (None, Some("}")),
+            _ => (Some("fn "), Some("}")),
         };
         
-        // Track functions and their sizes
         let mut function_sizes = Vec::new();
         let mut in_function = false;
         let mut current_function_start = 0;
@@ -322,7 +294,6 @@ impl StyleDetector {
             let trimmed = line.trim();
             
             if !in_function {
-                // Function start detection
                 if (fn_keyword.is_some() && trimmed.contains(fn_keyword.unwrap())) ||
                    (fn_keyword.is_none() && (trimmed.contains(" class ") || trimmed.contains(" void ") || 
                                           trimmed.contains(" int ") || trimmed.contains(" String "))) {
@@ -330,13 +301,11 @@ impl StyleDetector {
                     current_function_start = i;
                     bracket_count = 0;
                     
-                    // Count opening brackets
                     if trimmed.contains("{") {
                         bracket_count += 1;
                     }
                 }
             } else {
-                // Function end detection
                 if let Some(end_marker) = fn_end {
                     if trimmed.contains("{") {
                         bracket_count += 1;
@@ -346,16 +315,13 @@ impl StyleDetector {
                         bracket_count -= 1;
                         
                         if bracket_count <= 0 {
-                            // Function ended
                             let function_size = i - current_function_start + 1;
                             function_sizes.push(function_size);
                             in_function = false;
                         }
                     }
                 } else {
-                    // For Python, use indentation level
                     if i > current_function_start && !trimmed.is_empty() && !trimmed.starts_with(" ") && !trimmed.starts_with("\t") {
-                        // Function ended by indentation
                         let function_size = i - current_function_start;
                         function_sizes.push(function_size);
                         in_function = false;
@@ -364,7 +330,6 @@ impl StyleDetector {
             }
         }
         
-        // Calculate average function size
         if !function_sizes.is_empty() {
             let total_size: usize = function_sizes.iter().sum();
             let avg_size = total_size / function_sizes.len();
@@ -375,10 +340,8 @@ impl StyleDetector {
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(None);
             
-            // Add examples
             function_sizes.sort_unstable();
             
-            // Min, median, max examples
             if !function_sizes.is_empty() {
                 pattern.examples.push(format!("Smallest function: {} lines", function_sizes[0]));
                 
@@ -397,7 +360,6 @@ impl StyleDetector {
     }
 
     fn detect_naming_conventions(&self, content: &str, language: &str, file_path: &str, patterns: Arc<Mutex<StylePatternCollection>>) {
-        // Simplified detection for common identifiers
         let re_camel_case = regex::Regex::new(r"\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b").unwrap();
         let re_pascal_case = regex::Regex::new(r"\b[A-Z][a-zA-Z0-9]*\b").unwrap();
         let re_snake_case = regex::Regex::new(r"\b[a-z][a-z0-9]*(_[a-z0-9]+)+\b").unwrap();
@@ -411,7 +373,6 @@ impl StyleDetector {
         let total_identifiers = camel_count + pascal_count + snake_count + screaming_count;
         
         if total_identifiers > 0 {
-            // Find dominant naming convention
             let convention = if camel_count > pascal_count && camel_count > snake_count && camel_count > screaming_count {
                 NamingConvention::CamelCase
             } else if pascal_count > camel_count && pascal_count > snake_count && pascal_count > screaming_count {
@@ -424,8 +385,7 @@ impl StyleDetector {
                 NamingConvention::Mixed
             };
             
-            // If multiple conventions with significant presence, mark as mixed
-            let threshold = total_identifiers as f64 * 0.25; // 25% threshold
+            let threshold = total_identifiers as f64 * 0.25;
             let mut mixed = false;
             
             if (camel_count as f64 > threshold && convention != NamingConvention::CamelCase) ||
@@ -443,7 +403,6 @@ impl StyleDetector {
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(Some(file_path.to_string()));
             
-            // Get examples for each naming convention
             if camel_count > 0 {
                 if let Some(m) = re_camel_case.find(content) {
                     pattern.examples.push(format!("camelCase: {}", m.as_str()));
@@ -474,7 +433,6 @@ impl StyleDetector {
             return;
         }
         
-        // Collect all non-empty line lengths
         let mut line_lengths: Vec<usize> = lines.iter()
             .map(|line| line.len())
             .filter(|&len| len > 0)
@@ -484,11 +442,9 @@ impl StyleDetector {
             return;
         }
         
-        // Calculate average line length
         let total_length: usize = line_lengths.iter().sum();
         let avg_length = total_length / line_lengths.len();
         
-        // Find maximum line length (95th percentile to avoid outliers)
         line_lengths.sort_unstable();
         let p95_index = (line_lengths.len() as f64 * 0.95) as usize;
         let max_length = if p95_index < line_lengths.len() {
@@ -497,7 +453,6 @@ impl StyleDetector {
             line_lengths[line_lengths.len() - 1]
         };
         
-        // Add max line length metric
         {
             let style_rule = StyleRule::MaxLineLength(max_length);
             
@@ -505,7 +460,6 @@ impl StyleDetector {
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(None);
             
-            // Add examples of longest lines
             let mut longest_lines: Vec<(usize, &str)> = lines.iter()
                 .filter(|l| !l.trim().is_empty())
                 .map(|&l| (l.len(), l))
@@ -527,7 +481,6 @@ impl StyleDetector {
             patterns_lock.add_pattern(pattern);
         }
         
-        // Add average line length metric
         {
             let style_rule = StyleRule::AvgLineLength(avg_length);
             
@@ -535,7 +488,6 @@ impl StyleDetector {
             let mut pattern = StylePattern::new(style_rule, language);
             pattern.add_occurrence(None);
             
-            // Add distribution examples
             let p25_index = (line_lengths.len() as f64 * 0.25) as usize;
             let p50_index = (line_lengths.len() as f64 * 0.50) as usize;
             let p75_index = (line_lengths.len() as f64 * 0.75) as usize;

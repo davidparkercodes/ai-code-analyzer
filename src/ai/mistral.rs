@@ -49,7 +49,6 @@ impl MistralProvider {
             .build()
             .unwrap_or_default();
             
-        // Validate that we have an API key
         let _api_key = config.get_api_key(AiVendor::Mistral)?;
             
         Ok(Self {
@@ -115,7 +114,6 @@ impl AiModel for MistralProvider {
         
         let response_data: MistralResponse = response.json().await?;
         
-        // Extract the content from the first choice
         if let Some(choice) = response_data.choices.first() {
             Ok(choice.message.content.clone())
         } else {

@@ -5,13 +5,10 @@ use std::path::Path;
 use tempfile::tempdir;
 
 fn setup_test_directory(dir: &Path) {
-    // Create subdirectories
     fs::create_dir_all(dir.join("src/utils")).expect("Failed to create subdirectory");
     fs::create_dir_all(dir.join("tests")).expect("Failed to create subdirectory");
 
-    // Create Rust file
     let rust_content = r#"
-// main.rs
 fn main() {
     println!("Hello, world!");
     
@@ -22,7 +19,6 @@ fn main() {
     file.write_all(rust_content.as_bytes())
         .expect("Failed to write to file");
 
-    // Create Python file
     let py_content = r#"
 # script.py
 def main():
@@ -34,9 +30,7 @@ def main():
     file.write_all(py_content.as_bytes())
         .expect("Failed to write to file");
 
-    // Create JavaScript file
     let js_content = r#"
-// app.js
 function main() {
     console.log("Hello, world!");
     
@@ -60,28 +54,23 @@ fn test_collect_metrics() {
 
     let metrics = result.unwrap();
 
-    // We should have 3 files and 4 directories (root, src, src/utils, tests)
     assert_eq!(metrics.total_files, 3);
-    assert_eq!(metrics.total_directories, 4); // temp_dir, src, src/utils, tests
+    assert_eq!(metrics.total_directories, 4);
 
-    // Check language breakdown
-    assert_eq!(metrics.by_language.len(), 3); // Rust, Python, JavaScript
+    assert_eq!(metrics.by_language.len(), 3);
 
-    // Verify Rust metrics
     let rust_metrics = metrics
         .by_language
         .get("Rust")
         .expect("No Rust metrics found");
     assert_eq!(rust_metrics.files, 1);
 
-    // Verify Python metrics
     let py_metrics = metrics
         .by_language
         .get("Python")
         .expect("No Python metrics found");
     assert_eq!(py_metrics.files, 1);
 
-    // Verify JavaScript metrics
     let js_metrics = metrics
         .by_language
         .get("JavaScript")

@@ -63,7 +63,6 @@ impl MetricsCollector {
         
         let metrics_result = self.finalize_metrics(&metrics, &dir_count);
         
-        // Purge any stale entries from the cache periodically
         self.cache.purge_stale_entries();
         
         Ok(metrics_result)

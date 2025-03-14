@@ -26,7 +26,6 @@ impl DependencyReporter {
         
         self.print_summary(graph);
         
-        // Show dependency details if there are nodes
         if !graph.get_nodes().is_empty() {
             self.print_top_dependencies(graph);
         }
@@ -44,7 +43,6 @@ impl DependencyReporter {
         
         let node_count = graph.get_nodes().len();
         
-        // Summary statistics
         let mut summary_data = Vec::new();
         summary_data.push(("Total Files", node_count.to_string()));
         
@@ -85,10 +83,8 @@ impl DependencyReporter {
             }
         }
         
-        // Find the longest label for alignment
         let max_label_len = summary_data.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
         
-        // Print summary table with aligned columns
         for (label, value) in summary_data {
             println!(
                 "{}{}    {}",
@@ -154,7 +150,6 @@ impl DependencyReporter {
             StyledText::new("================").foreground(ThemeColors::SEPARATOR)
         );
         
-        // Get all nodes with their dependency counts
         let mut nodes_with_counts: Vec<(String, usize, usize)> = graph
             .get_nodes()
             .iter()
@@ -165,33 +160,27 @@ impl DependencyReporter {
             })
             .collect();
         
-        // Sort by total connections (dependencies + dependents) descending
         nodes_with_counts.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)));
         
-        // Take top 10 or all if less than 10
         let top_nodes = if nodes_with_counts.len() > 10 {
             &nodes_with_counts[0..10]
         } else {
             &nodes_with_counts[..]
         };
         
-        // Skip if no dependencies
         if top_nodes.is_empty() || (top_nodes[0].1 == 0 && top_nodes[0].2 == 0) {
             println!("{}", StyledText::new("No significant dependencies found.").foreground(ThemeColors::LANGUAGE));
             return;
         }
         
-        // Constants for table formatting
         const COL_SPACING: usize = 4;
         let file_header = "File";
         let deps_header = "Dependencies";
         let dependents_header = "Dependents";
         
-        // Calculate column widths
         let max_filename_len = top_nodes
             .iter()
             .map(|(name, _, _)| {
-                // Get the last part of the path for display
                 match name.split('/').last() {
                     Some(last) => last.len(),
                     None => name.len(),
@@ -215,12 +204,10 @@ impl DependencyReporter {
             .unwrap_or(0)
             .max(dependents_header.len());
         
-        // Calculate column widths
         let filename_width = max_filename_len + COL_SPACING;
         let deps_width = max_deps + COL_SPACING;
         let dependents_width = max_dependents + COL_SPACING;
         
-        // Print header
         let header = format!("{:<filename_width$}{:>deps_width$}{:>dependents_width$}",
             file_header,
             deps_header,
@@ -231,7 +218,6 @@ impl DependencyReporter {
         );
         println!("{}", StyledText::new(&header).foreground(ThemeColors::TABLE_HEADER));
         
-        // Print header separator
         let file_separator = "-".repeat(file_header.len());
         let deps_separator = "-".repeat(deps_header.len());
         let dependents_separator = "-".repeat(dependents_header.len());
@@ -246,30 +232,24 @@ impl DependencyReporter {
         );
         println!("{}", StyledText::new(&separator).foreground(ThemeColors::TABLE_HEADER));
         
-        // Print node rows
         for (name, deps, dependents) in top_nodes {
-            // Get the last part of the path for display
             let display_name = match name.split('/').last() {
                 Some(last) => last,
                 None => name,
             };
             
-            // Print filename column
             print!("{}", StyledText::new(display_name)
                 .foreground(ThemeColors::LANGUAGE)
                 .style(Style::Bold));
             
-            // Calculate required padding between columns
             let filename_padding = filename_width - display_name.len();
             print!("{}", " ".repeat(filename_padding));
             
-            // Print dependencies column
             let deps_str = deps.to_string();
             let deps_padding = deps_width - deps_str.len();
             print!("{}{}", " ".repeat(deps_padding), 
                 StyledText::new(&deps_str).foreground(ThemeColors::NUMBER));
             
-            // Print dependents column
             let dependents_str = dependents.to_string();
             let dependents_padding = dependents_width - dependents_str.len();
             println!("{}{}", " ".repeat(dependents_padding),

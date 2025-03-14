@@ -39,11 +39,9 @@ pub enum Style {
     Reverse,
 }
 
-// Set consistent colors for the application
 pub struct ThemeColors;
 
 impl ThemeColors {
-    // Primary theme colors
     pub const HEADER: Color = Color::Cyan;
     pub const SEPARATOR: Color = Color::Cyan;
     pub const TABLE_HEADER: Color = Color::Blue;
@@ -78,7 +76,6 @@ impl StyledText {
         self
     }
     
-    // Remove to_string method as it shadows Display implementation
 }
 
 impl fmt::Display for StyledText {
@@ -165,7 +162,6 @@ impl Style {
     }
 }
 
-// Helper functions for common styling patterns
 pub fn header(text: &str) -> StyledText {
     StyledText::new(text)
         .foreground(ThemeColors::HEADER)
@@ -194,7 +190,16 @@ pub fn highlight(text: &str) -> StyledText {
         .style(Style::Bold)
 }
 
-// Print helpers
+pub fn bold(text: &str) -> StyledText {
+    StyledText::new(text)
+        .style(Style::Bold)
+}
+
+pub fn dimmed(text: &str) -> StyledText {
+    StyledText::new(text)
+        .style(Style::Dim)
+}
+
 pub fn print_header(text: &str) {
     println!("{}", header(text));
 }

@@ -79,16 +79,13 @@ impl CodeDescriptor {
         
         style::print_info("🔎 Scanning codebase files...");
         
-        // Collect and process files
         let batches = self.build_file_batches(path)?;
         style::print_info(&format!("📦 Collected {} file batches for analysis", batches.len()));
         
-        // Generate batch summaries using low-tier model
         style::print_info("🚀 Starting AI analysis process...");
         let batch_summaries = self.generate_batch_summaries(&batches).await?;
         style::print_info(&format!("📝 Generated {} batch summaries", batch_summaries.len()));
         
-        // Generate final description using high-tier model
         let description = self.generate_final_description(&batch_summaries).await?;
         
         style::print_info("🎉 Codebase analysis complete!");
@@ -102,11 +99,9 @@ impl CodeDescriptor {
         self.build_file_batches(dir_path)
     }
 
-    // Main file collection implementation
     fn build_file_batches<P: AsRef<Path>>(&self, dir_path: P) -> AppResult<Vec<FileBatch>> {
         let path = dir_path.as_ref();
         
-        // Create walker that respects .gitignore
         let walker = WalkBuilder::new(path)
             .hidden(false)
             .git_ignore(true)
@@ -117,13 +112,11 @@ impl CodeDescriptor {
             })
             .build();
         
-        // Collect all entries first
         let entries: Vec<DirEntry> = walker
             .filter_map(|result| {
                 match result {
                     Ok(entry) => Some(entry),
                     Err(err) => {
-                        // Proper error logging but continue without failing
                         style::print_warning(&format!("Warning during file scan: {}", err));
                         None
                     }
@@ -131,7 +124,6 @@ impl CodeDescriptor {
             })
             .collect();
         
-        // Filter to get only file entries
         let file_entries: Vec<&DirEntry> = entries
             .iter()
             .filter(|e| e.path().is_file())
@@ -139,36 +131,31 @@ impl CodeDescriptor {
         
         style::print_info(&format!("Found {} files for analysis", file_entries.len()));
         
-        // Process file entries
         let file_data = Arc::new(Mutex::new(Vec::<FileData>::new()));
         
         let process_entry = |entry: &&DirEntry| {
             let path = entry.path();
             let path_str = path.to_string_lossy().to_string();
             
-            // Skip binary files and very large files
             if let Ok(metadata) = fs::metadata(path) {
-                if metadata.len() > 500000 { // Skip files larger than ~500KB
+                if metadata.len() > 500000 {
                     return;
                 }
             }
             
-            // Get file content
             let content = if let Some(cached_content) = self.cache.get_file_content(&path_str) {
                 cached_content
             } else if let Ok(file_content) = fs::read_to_string(path) {
                 self.cache.cache_file_content(&path_str, file_content.clone());
                 file_content
             } else {
-                return; // Skip if we can't read the file
+                return;
             };
             
-            // Skip empty files
             if content.trim().is_empty() {
                 return;
             }
             
-            // Detect language
             let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
             let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
             
@@ -184,7 +171,6 @@ impl CodeDescriptor {
                 detected_lang
             };
             
-            // Add the file data
             let mut file_data_guard = file_data.lock().unwrap();
             file_data_guard.push(FileData {
                 path: path_str,
@@ -193,21 +179,17 @@ impl CodeDescriptor {
             });
         };
         
-        // Process files in parallel or sequentially
         if self.parallel {
             file_entries.par_iter().for_each(process_entry);
         } else {
             file_entries.iter().for_each(process_entry);
         }
         
-        // Create file batches
         let all_files = file_data.lock().unwrap().clone();
         
-        // Group files by directory structure
         let mut grouped_files: HashMap<String, Vec<FileData>> = HashMap::new();
         
         for file in all_files {
-            // Get the directory path by removing the file name
             let path = Path::new(&file.path);
             let parent = path.parent()
                 .map(|p| p.to_string_lossy().to_string())
@@ -218,11 +200,9 @@ impl CodeDescriptor {
                 .push(file);
         }
         
-        // Create batches
         let mut batches = Vec::new();
         
         for (dir_path, files) in grouped_files {
-            // If the directory has more files than the batch size, split them
             if files.len() > BATCH_SIZE {
                 for chunk in files.chunks(BATCH_SIZE) {
                     batches.push(FileBatch {
@@ -241,30 +221,23 @@ impl CodeDescriptor {
         Ok(batches)
     }
 
-    // Generate summaries for each batch of files using the low-tier AI model
     async fn generate_batch_summaries(&self, batches: &[FileBatch]) -> AppResult<Vec<String>> {
         let mut summaries = Vec::new();
         
-        // Create the low-tier AI model
         let low_tier_model = self.create_low_tier_model()?;
         
         style::print_info("Generating batch summaries with AI...");
         style::print_info(&format!("Processing {} batch(es) with low-tier model", batches.len()));
         
-        // We'll process each batch sequentially, regardless of the parallel flag
-        // This is to avoid async runtime issues
         for (batch_index, batch) in batches.iter().enumerate() {
             let batch_desc = self.format_batch_description(batch);
             let file_count = batch.files.len();
             
-            // Log batch beginning
             self.log_batch_processing_start(batch_index, batches.len(), file_count, &batch_desc);
             
-            // Format files and create prompt
             let file_texts = self.prepare_files_for_analysis(&batch.files);
             let prompt = self.create_batch_analysis_prompt(&batch.base_path, &file_texts);
             
-            // Call the AI model and process result
             self.process_batch_result(
                 &low_tier_model, 
                 &prompt, 
@@ -279,13 +252,11 @@ impl CodeDescriptor {
         Ok(summaries)
     }
     
-    // Create a low-tier AI model for batch processing
     fn create_low_tier_model(&self) -> AppResult<Arc<dyn AiModel>> {
         factory::create_ai_model(self.ai_config.clone(), ModelTier::Low)
             .map_err(|e| AppError::Ai(e))
     }
     
-    // Format batch description for logging
     fn format_batch_description(&self, batch: &FileBatch) -> String {
         if batch.base_path.is_empty() {
             "root directory".to_string()
@@ -294,7 +265,6 @@ impl CodeDescriptor {
         }
     }
     
-    // Log the start of batch processing
     fn log_batch_processing_start(&self, batch_index: usize, total_batches: usize, file_count: usize, batch_desc: &str) {
         style::print_info(&format!(
             "🔍 [Batch {}/{}] Processing {} files from {}", 
@@ -305,7 +275,6 @@ impl CodeDescriptor {
         ));
     }
     
-    // Format all files in a batch for AI analysis
     fn prepare_files_for_analysis(&self, files: &[FileData]) -> Vec<String> {
         let mut file_texts = Vec::new();
         
@@ -317,15 +286,12 @@ impl CodeDescriptor {
         file_texts
     }
     
-    // Format a single file for AI analysis
     fn format_file_for_analysis(&self, file: &FileData) -> String {
-        // Limit content to first 1000 lines to avoid overloading the model
         let content = file.content.lines()
             .take(1000)
             .collect::<Vec<&str>>()
             .join("\n");
         
-        // Format file info
         format!(
             "File: {}\nLanguage: {}\n\n```{}\n{}\n```\n",
             file.path,
@@ -335,7 +301,6 @@ impl CodeDescriptor {
         )
     }
     
-    // Create the AI prompt for batch analysis
     fn create_batch_analysis_prompt(&self, directory: &str, file_texts: &[String]) -> String {
         format!(
             "You are an expert software developer analyzing a codebase. 
@@ -356,7 +321,6 @@ Directory: {}\n\n{}",
         )
     }
     
-    // Process the result of an AI batch analysis
     async fn process_batch_result(
         &self, 
         model: &Arc<dyn AiModel>, 
@@ -378,7 +342,6 @@ Directory: {}\n\n{}",
         }
     }
     
-    // Log successful batch processing
     fn log_batch_success(&self, batch_index: usize, total_batches: usize, file_count: usize, batch_desc: &str) {
         style::print_info(&format!(
             "✅ [Batch {}/{}] Successfully summarized {} files from {}", 
@@ -389,7 +352,6 @@ Directory: {}\n\n{}",
         ));
     }
     
-    // Log failed batch processing
     fn log_batch_failure(&self, batch_index: usize, total_batches: usize, error: &dyn std::fmt::Display) {
         style::print_warning(&format!(
             "❌ [Batch {}/{}] Failed to summarize batch: {}", 
@@ -401,15 +363,12 @@ Directory: {}\n\n{}",
     
     /// Generate the final description using the high-tier AI model
     async fn generate_final_description(&self, batch_summaries: &[String]) -> AppResult<String> {
-        // Create the high-tier AI model
         style::print_info("📚 Creating high-tier AI model for final analysis...");
         let high_tier_model = factory::create_ai_model(self.ai_config.clone(), ModelTier::High)
             .map_err(|e| AppError::Ai(e))?;
         
-        // Join all the summaries
         let all_summaries = batch_summaries.join("\n\n---\n\n");
         
-        // Create the prompt
         let prompt = format!(
             "You are an expert software developer creating a clear overview of a codebase 
 based on the following summarized components. Each separated section represents 
@@ -440,7 +399,6 @@ Here are the component summaries:
         style::print_info("🧠 Generating final codebase description with high-tier AI model...");
         style::print_info("⏳ This may take a moment as the AI analyzes all component summaries...");
         
-        // Generate the final description
         let description = match high_tier_model.generate_response(&prompt).await {
             Ok(text) => {
                 style::print_info("✅ Successfully generated comprehensive codebase description!");

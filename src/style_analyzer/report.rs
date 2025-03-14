@@ -28,52 +28,41 @@ impl StyleReport {
         self.language_stats.insert(language.to_string(), file_count);
     }
 
-    // These methods are removed as they're currently unused
-    // If needed in the future, uncomment and implement
 
-    // Removed unused method that was causing dead code warning
 
     pub fn generate_style_guide(&mut self) {
         let mut guide = String::new();
         guide.push_str("# Code Metrics Analysis\n\n");
         guide.push_str("This analysis was automatically generated based on measured metrics in your codebase.\n\n");
         
-        // Add language statistics
         guide.push_str("## Codebase Statistics\n\n");
         if !self.language_stats.is_empty() {
-            // First pass to determine column widths
             let mut lang_width = "Language".len();
             let mut count_width = "Number of Files".len();
             
             let mut languages: Vec<_> = self.language_stats.iter().collect();
             languages.sort_by(|a, b| b.1.cmp(a.1));
             
-            // Calculate required column widths
             for (language, count) in &languages {
                 lang_width = std::cmp::max(lang_width, language.len());
                 count_width = std::cmp::max(count_width, count.to_string().len());
             }
             
-            // Create properly padded table headers
             guide.push_str(&format!("| {:<lang_width$} | {:<count_width$} |\n", "Language", "Number of Files"));
             guide.push_str(&format!("| {:-<lang_width$} | {:-<count_width$} |\n", "", ""));
             
-            // Add rows with proper padding
             for (language, count) in languages {
                 guide.push_str(&format!("| {:<lang_width$} | {:<count_width$} |\n", language, count));
             }
             guide.push_str("\n");
         }
         
-        // Group patterns by language for organized output
         let mut lang_patterns: HashMap<String, Vec<&StylePattern>> = HashMap::new();
         
-        // Add patterns to language groups
         for pattern in &self.patterns {
-            // Filter out unrealistic metrics
             if let StyleRule::MaxLineLength(length) = pattern.rule {
                 if length < 20 {
-                    continue; // Skip unrealistically short line lengths
+                    continue;
                 }
             }
             
@@ -83,7 +72,6 @@ impl StyleReport {
                 .push(pattern);
         }
         
-        // Create ordered list of languages by file count (highest to lowest)
         let mut languages: Vec<(&String, &usize)> = self.language_stats.iter().collect();
         languages.sort_by(|a, b| b.1.cmp(a.1));
         
@@ -91,12 +79,10 @@ impl StyleReport {
             .map(|(lang, _)| (*lang).clone())
             .collect();
         
-        // Generate language-specific metrics in order of file count
         for lang in lang_order {
             if let Some(patterns) = lang_patterns.get(&lang) {
                 guide.push_str(&format!("## {} Metrics\n\n", lang));
                 
-                // Line length metrics
                 let mut max_line_length = None;
                 let mut avg_line_length = None;
                 
@@ -132,7 +118,6 @@ impl StyleReport {
                     guide.push_str("\n");
                 }
             
-                // Indentation 
                 if let Some(pattern) = patterns.iter().find(|p| {
                     matches!(p.rule, StyleRule::IndentationStyle(_))
                 }) {
@@ -159,9 +144,7 @@ impl StyleReport {
                     }
                 }
                 
-                // Naming conventions section removed as it needs more refined analysis by identifier type
             
-                // Function size
                 if let Some(pattern) = patterns.iter().find(|p| {
                     matches!(p.rule, StyleRule::FunctionSize(_))
                 }) {
@@ -171,7 +154,6 @@ impl StyleReport {
                         StyleRule::FunctionSize(size) => {
                             guide.push_str(&format!("- Average function length: **{} lines**\n", size));
                             
-                            // Calculate percentile distribution if available
                             if !pattern.examples.is_empty() {
                                 guide.push_str("\nFunction size examples:\n\n");
                                 for example in &pattern.examples {
@@ -184,7 +166,6 @@ impl StyleReport {
                     }
                 }
                 
-                // Comment density
                 if let Some(pattern) = patterns.iter().find(|p| {
                     matches!(p.rule, StyleRule::CommentDensity(_))
                 }) {
@@ -202,18 +183,15 @@ impl StyleReport {
             }
         }
         
-        // Add general insights
         guide.push_str("## Metrics Insights\n\n");
         guide.push_str("- Line length: Most style guides recommend 80-120 characters maximum\n");
         guide.push_str("- Indentation: Consistent indentation improves readability\n");
         guide.push_str("- Function size: Smaller functions (under 20-30 lines) are generally more maintainable\n");
         guide.push_str("- Comment density: Aim for self-documenting code with targeted comments for complex logic\n");
-        // Removed naming conventions insight as we're not analyzing them in detail yet
         
         self.style_guide = Some(guide);
     }
     
-    // No longer needed - we're focusing only on concrete metrics
 
     pub fn get_style_guide(&self) -> Option<&str> {
         self.style_guide.as_deref()
@@ -224,10 +202,8 @@ impl fmt::Display for StyleReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "== Code Metrics Analysis Report ==")?;
         
-        // Language statistics
         writeln!(f, "\nLanguage Statistics:")?;
         
-        // Sort languages by file count (highest to lowest)
         let mut languages: Vec<(&String, &usize)> = self.language_stats.iter().collect();
         languages.sort_by(|a, b| b.1.cmp(a.1));
         
@@ -235,15 +211,12 @@ impl fmt::Display for StyleReport {
             writeln!(f, "  {}: {} files", language, count)?;
         }
         
-        // Group patterns by language for organized display
         let mut lang_patterns: HashMap<String, Vec<&StylePattern>> = HashMap::new();
         
-        // Skip unrealistic metrics (like very short line lengths)
         for pattern in &self.patterns {
-            // Filter out unrealistic metrics
             if let StyleRule::MaxLineLength(length) = pattern.rule {
                 if length < 20 {
-                    continue; // Skip unrealistically short line lengths
+                    continue;
                 }
             }
             
@@ -253,22 +226,18 @@ impl fmt::Display for StyleReport {
                 .push(pattern);
         }
         
-        // Create ordered list of languages by file count
         let lang_order: Vec<String> = languages.iter()
             .map(|(lang, _)| (*lang).clone())
             .collect();
             
-        // Display metrics by language in order of file count
         for lang in &lang_order {
             if let Some(patterns) = lang_patterns.get(lang) {
                 writeln!(f, "\n{} Metrics:", lang)?;
                 
-                // Line length metrics - show only max and average
                 let mut max_length = 0;
                 let mut total_avg_length = 0;
                 let mut avg_count = 0;
             
-                // Find the maximum line length and average the avg line lengths
                 for pattern in patterns.iter() {
                     match &pattern.rule {
                         StyleRule::MaxLineLength(length) => {
@@ -284,7 +253,6 @@ impl fmt::Display for StyleReport {
                     }
                 }
                 
-                // Display aggregated metrics
                 if max_length > 0 {
                     writeln!(f, "  Max Line Length: {} chars", max_length)?;
                 }
@@ -294,7 +262,6 @@ impl fmt::Display for StyleReport {
                     writeln!(f, "  Avg Line Length: {} chars", avg_length)?;
                 }
             
-                // Indentation
                 if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::IndentationStyle(_))) {
                     match &pattern.rule {
                         StyleRule::IndentationStyle(style) => {
@@ -316,7 +283,6 @@ impl fmt::Display for StyleReport {
                     }
                 }
                 
-                // Function size
                 if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::FunctionSize(_))) {
                     match &pattern.rule {
                         StyleRule::FunctionSize(size) => {
@@ -326,7 +292,6 @@ impl fmt::Display for StyleReport {
                     }
                 }
                 
-                // Comment density
                 if let Some(pattern) = patterns.iter().find(|p| matches!(p.rule, StyleRule::CommentDensity(_))) {
                     match &pattern.rule {
                         StyleRule::CommentDensity(density) => {
@@ -337,11 +302,9 @@ impl fmt::Display for StyleReport {
                     }
                 }
                 
-                // Naming conventions section removed as it needs more refined analysis by identifier type
             }
         }
         
-        // Note about metrics report
         writeln!(f, "\nA comprehensive metrics report is available.")?;
         
         Ok(())

@@ -22,10 +22,8 @@ impl MetricsReporter {
             StyledText::new("====================").foreground(ThemeColors::SEPARATOR)
         );
         
-        // Print overall metrics
         self.print_overall_metrics(metrics);
         
-        // Print production code metrics
         println!();
         print_header("Production Code Metrics:");
         println!(
@@ -34,7 +32,6 @@ impl MetricsReporter {
         );
         self.print_production_metrics(metrics);
         
-        // Print test code metrics
         println!();
         print_header("Test Code Metrics:");
         println!(
@@ -45,7 +42,6 @@ impl MetricsReporter {
     }
     
     fn print_overall_metrics(&self, metrics: &CodeMetrics) {
-        // Format metrics as a table with aligned numbers
         let labels = [
             "Total Directories:",
             "Total Files:",
@@ -62,13 +58,10 @@ impl MetricsReporter {
             metrics.comment_lines,
         ];
         
-        // Find the longest label for alignment
         let max_label_len = labels.iter().map(|l| l.len()).max().unwrap_or(0);
         
-        // Find the longest value for alignment
         let max_value_len = values.iter().map(|v| v.to_string().len()).max().unwrap_or(0);
         
-        // Print summary table
         for (label, value) in labels.iter().zip(values.iter()) {
             println!(
                 "{}{}    {}",
@@ -82,7 +75,6 @@ impl MetricsReporter {
     }
     
     fn print_production_metrics(&self, metrics: &CodeMetrics) {
-        // Production metrics
         let labels = [
             "Files:",
             "Lines of Code:",
@@ -97,13 +89,10 @@ impl MetricsReporter {
             metrics.prod_comment_lines,
         ];
         
-        // Find the longest label for alignment
         let max_label_len = labels.iter().map(|l| l.len()).max().unwrap_or(0);
         
-        // Find the longest value for alignment
         let max_value_len = values.iter().map(|v| v.to_string().len()).max().unwrap_or(0);
         
-        // Print summary table
         for (label, value) in labels.iter().zip(values.iter()) {
             println!(
                 "{}{}    {}",
@@ -117,7 +106,6 @@ impl MetricsReporter {
     }
     
     fn print_test_metrics(&self, metrics: &CodeMetrics) {
-        // Test metrics
         let labels = [
             "Files:",
             "Lines of Code:",
@@ -132,13 +120,10 @@ impl MetricsReporter {
             metrics.test_comment_lines,
         ];
         
-        // Find the longest label for alignment
         let max_label_len = labels.iter().map(|l| l.len()).max().unwrap_or(0);
         
-        // Find the longest value for alignment
         let max_value_len = values.iter().map(|v| v.to_string().len()).max().unwrap_or(0);
         
-        // Print summary table
         for (label, value) in labels.iter().zip(values.iter()) {
             println!(
                 "{}{}    {}",
@@ -150,7 +135,6 @@ impl MetricsReporter {
             );
         }
 
-        // Show overall breakdown by language
         if !metrics.by_language.is_empty() {
             println!();
             print_header("Overall Breakdown by Language:");
@@ -162,7 +146,6 @@ impl MetricsReporter {
             self.print_language_breakdown(&metrics.by_language);
         }
         
-        // Show production code breakdown by language
         if !metrics.prod_by_language.is_empty() {
             println!();
             print_header("Production Code by Language:");
@@ -174,7 +157,6 @@ impl MetricsReporter {
             self.print_language_breakdown(&metrics.prod_by_language);
         }
         
-        // Show test code breakdown by language
         if !metrics.test_by_language.is_empty() {
             println!();
             print_header("Test Code by Language:");
@@ -193,19 +175,16 @@ impl MetricsReporter {
 
         languages.sort_by(|a, b| b.1.lines_of_code.cmp(&a.1.lines_of_code));
         
-        // Skip if empty
         if languages.is_empty() {
             println!("No language data available.");
             return;
         }
         
-        // Constants for table formatting
-        const COL_SPACING: usize = 6; // Spacing between columns
+        const COL_SPACING: usize = 6;
         let language_header = "Language";
         let files_header = "Files";
         let loc_header = "Lines of Code";
         
-        // Calculate column widths
         let max_lang_len = languages.iter()
             .map(|(lang, _)| lang.len())
             .max()
@@ -224,12 +203,10 @@ impl MetricsReporter {
             .unwrap_or(0)
             .max(loc_header.len());
         
-        // Calculate column widths
         let lang_width = max_lang_len + COL_SPACING;
         let files_width = max_files + COL_SPACING;
         let loc_width = max_loc + COL_SPACING;
         
-        // Print header
         let header = format!("{:<lang_width$}{:>files_width$}{:>loc_width$}",
             language_header,
             files_header,
@@ -240,7 +217,6 @@ impl MetricsReporter {
         );
         println!("{}", StyledText::new(&header).foreground(ThemeColors::TABLE_HEADER));
         
-        // Print header separator
         let lang_separator = "-".repeat(language_header.len());
         let files_separator = "-".repeat(files_header.len());
         let loc_separator = "-".repeat(loc_header.len());
@@ -255,14 +231,11 @@ impl MetricsReporter {
         );
         println!("{}", StyledText::new(&separator).foreground(ThemeColors::TABLE_HEADER));
 
-        // Print language rows
         for (language, lang_metrics) in languages {
-            // Use a different approach: print each column separately with correct spacing
             print!("{}", StyledText::new(language)
                 .foreground(ThemeColors::LANGUAGE)
                 .style(Style::Bold));
             
-            // Calculate required padding between columns
             let lang_padding = lang_width - language.len();
             print!("{}", " ".repeat(lang_padding));
             

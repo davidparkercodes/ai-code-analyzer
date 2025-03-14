@@ -13,18 +13,14 @@ pub struct AiConfig {
     pub openai_api_key: Option<String>,
     pub mistral_api_key: Option<String>,
     
-    // Model names for each provider and tier
-    // Anthropic
     pub anthropic_low_model: String,
     pub anthropic_medium_model: String,
     pub anthropic_high_model: String,
     
-    // OpenAI
     pub openai_low_model: String,
     pub openai_medium_model: String,
     pub openai_high_model: String,
     
-    // Mistral
     pub mistral_low_model: String,
     pub mistral_medium_model: String,
     pub mistral_high_model: String,
@@ -35,12 +31,10 @@ impl Default for AiConfig {
         Self {
             vendor: AiVendor::default(),
             
-            // API keys
             anthropic_api_key: None,
             openai_api_key: None,
             mistral_api_key: None,
             
-            // Default model names
             anthropic_low_model: "claude-3-haiku-20240307".to_string(),
             anthropic_medium_model: "claude-3-sonnet-20240229".to_string(),
             anthropic_high_model: "claude-3-opus-20240229".to_string(),
@@ -59,18 +53,14 @@ impl Default for AiConfig {
 impl AiConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, AiError> {
-        // Load .env file if present
         dotenv().ok();
         
-        // Start with defaults
         let mut config = Self::default();
         
-        // Set vendor
         if let Ok(vendor_str) = env::var("AI_PROVIDER") {
             config.vendor = vendor_str.parse().map_err(|e| AiError::Config(e))?;
         }
         
-        // Set API keys for each provider
         if let Ok(key) = env::var("ANTHROPIC_API_KEY") {
             config.anthropic_api_key = Some(key);
         }
@@ -83,7 +73,6 @@ impl AiConfig {
             config.mistral_api_key = Some(key);
         }
         
-        // Set model names (if provided)
         Self::set_model_if_exists(&mut config.anthropic_low_model, "ANTHROPIC_LOW_MODEL");
         Self::set_model_if_exists(&mut config.anthropic_medium_model, "ANTHROPIC_MEDIUM_MODEL");
         Self::set_model_if_exists(&mut config.anthropic_high_model, "ANTHROPIC_HIGH_MODEL");
@@ -96,7 +85,6 @@ impl AiConfig {
         Self::set_model_if_exists(&mut config.mistral_medium_model, "MISTRAL_MEDIUM_MODEL");
         Self::set_model_if_exists(&mut config.mistral_high_model, "MISTRAL_HIGH_MODEL");
         
-        // Validate that we have an API key for the selected vendor
         match config.vendor {
             AiVendor::Anthropic if config.anthropic_api_key.is_none() => {
                 return Err(AiError::Config("Missing ANTHROPIC_API_KEY for Anthropic vendor".to_string()));
