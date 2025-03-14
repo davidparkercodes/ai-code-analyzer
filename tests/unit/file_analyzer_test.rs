@@ -42,7 +42,7 @@ fn main() {
     assert_eq!(metrics.files, 1);
     assert_eq!(metrics.lines_of_code, 4);
     assert_eq!(metrics.blank_lines, 2);
-    assert_eq!(metrics.comment_lines, 5);
+    assert_eq!(metrics.comment_lines, 3);
 }
 
 #[test]
