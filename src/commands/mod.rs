@@ -151,7 +151,7 @@ pub enum Commands {
         no_parallel: bool,
         
         /// AI model tier to use (low, medium, high)
-        #[arg(long, default_value = "medium")]
+        #[arg(long = "ai-level", default_value = "medium")]
         ai_level: String,
         
         /// Focus only on violations and recommendations (skip positive feedback)
