@@ -6,6 +6,9 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
 
 ## Comments Policy
 
+-   ⚠️ NO UNNECESSARY COMMENTS IN CODE - code should be self-documenting
+-   ⚠️ NO UNNECESSARY COMMENTS IN CODE - code should be self-documenting
+-   ⚠️ NO UNNECESSARY COMMENTS IN CODE -- when you make changes to the code, DO NOT ADD UNNECESSARY COMMENTS - code should be self-documenting
 -   ⚠️ NEVER add comments to implementation files - code should be self-documenting
 -   ⚠️ ONLY add explanatory comments to test files for describing test setup and assertions
 -   ⚠️ No TODOs, no explanatory comments, no commented-out code in implementation files
