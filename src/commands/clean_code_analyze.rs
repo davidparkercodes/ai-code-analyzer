@@ -13,9 +13,10 @@ pub async fn execute(
     path: String, 
     output_path: Option<String>, 
     no_parallel: bool,
-    ai_level: String
+    ai_level: String,
+    only_recommendations: bool
 ) -> i32 {
-    match execute_clean_code_analyze_command(path, output_path, no_parallel, ai_level).await {
+    match execute_clean_code_analyze_command(path, output_path, no_parallel, ai_level, only_recommendations).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -25,7 +26,8 @@ async fn execute_clean_code_analyze_command(
     path: String, 
     custom_output_path: Option<String>, 
     no_parallel: bool,
-    ai_level: String
+    ai_level: String,
+    only_recommendations: bool
 ) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let analyzer = FileAnalyzer::new();
@@ -45,24 +47,24 @@ async fn execute_clean_code_analyze_command(
         return Err(AppError::Analysis(format!("No source files found in {}", path)));
     }
 
-    style::print_info(&format!("Found {} source files to analyze", source_files.len()));
+    style::print_info(&format!("📂 Found {} source files to analyze", source_files.len()));
     
     // Process files in batches of 10
     let batch_size = 10;
     let batch_count = (source_files.len() + batch_size - 1) / batch_size; // Ceiling division
     
-    style::print_info(&format!("Processing {} batches of up to {} files each", batch_count, batch_size));
+    style::print_info(&format!("🔄 Processing {} batches of up to {} files each", batch_count, batch_size));
     
     for batch_index in 0..batch_count {
         let start_idx = batch_index * batch_size;
         let end_idx = std::cmp::min(start_idx + batch_size, source_files.len());
         let batch_files = &source_files[start_idx..end_idx];
         
-        style::print_info(&format!("Processing batch {}/{} ({} files)", 
+        style::print_info(&format!("⏳ Processing batch {}/{} ({} files)", 
             batch_index + 1, batch_count, batch_files.len()));
         
         let analysis_result = analyze_clean_code_batch(
-            &analyzer, batch_files, model.clone(), batch_index + 1
+            &analyzer, batch_files, model.clone(), batch_index + 1, only_recommendations
         ).await?;
         
         display_analysis_results(&analysis_result, start_time.elapsed());
@@ -78,14 +80,14 @@ async fn execute_clean_code_analyze_command(
     }
     
     let elapsed = start_time.elapsed();
-    style::print_success(&format!("All batches processed in {:.2?}", elapsed));
+    style::print_success(&format!("✅ All batches processed in {:.2?}", elapsed));
     
     Ok(())
 }
 
 fn display_analysis_header(directory_path: &str) {
-    style::print_header("Analyzing Clean Code Principles");
-    style::print_info(&format!("Analyzing directory: {}", directory_path));
+    style::print_header("🔍 Analyzing Clean Code Principles");
+    style::print_info(&format!("📂 Analyzing directory: {}", directory_path));
 }
 
 fn load_ai_configuration() -> AppResult<AiConfig> {
@@ -111,7 +113,8 @@ async fn analyze_clean_code_batch(
     _analyzer: &FileAnalyzer,
     batch_files: &[std::path::PathBuf],
     model: Arc<dyn crate::ai::AiModel>,
-    batch_number: usize
+    batch_number: usize,
+    only_recommendations: bool
 ) -> AppResult<String> {
     let mut all_code = String::new();
     
@@ -122,26 +125,48 @@ async fn analyze_clean_code_batch(
         all_code.push_str(&format!("\n\n// File: {}\n{}", file_path.display(), file_content));
     }
     
-    let prompt = format!(
-        "Analyze the following code and evaluate if it follows Clean Code principles:\n\
-        - Use meaningful and intention-revealing names\n\
-        - Functions should do one thing only and do it well\n\
-        - Keep functions small (preferably under 20 lines)\n\
-        - Arguments should be few (ideally 0-2, maximum 3)\n\
-        - Avoid side effects in functions\n\
-        - Don't repeat yourself (DRY)\n\
-        - Maintain clear separation of concerns\n\n\
-        For each principle, indicate whether the code follows it, with specific examples of good practices \
-        or violations found. Then provide actionable recommendations on how to improve the code to better \
-        follow Clean Code principles. Be constructive and specific. Include line numbers or function names \
-        in your recommendations whenever possible.\n\n\
-        Analyze these {} files (Batch #{}):\n{}",
-        batch_files.len(),
-        batch_number,
-        all_code
-    );
+    let prompt = if only_recommendations {
+        format!(
+            "Analyze the following code and focus ONLY on Clean Code principles violations:\n\
+            - Use meaningful and intention-revealing names\n\
+            - Functions should do one thing only and do it well\n\
+            - Keep functions small (preferably under 20 lines)\n\
+            - Arguments should be few (ideally 0-2, maximum 3)\n\
+            - Avoid side effects in functions\n\
+            - Don't repeat yourself (DRY)\n\
+            - Maintain clear separation of concerns\n\n\
+            For each principle, ONLY identify violations and problematic code. Then provide actionable \
+            recommendations on how to improve the code to better follow Clean Code principles. Do not \
+            mention good practices or compliments about the code - focus exclusively on what needs improvement. \
+            Be constructive and specific. Include line numbers or function names in your recommendations \
+            whenever possible.\n\n\
+            Analyze these {} files (Batch #{}):\n{}",
+            batch_files.len(),
+            batch_number,
+            all_code
+        )
+    } else {
+        format!(
+            "Analyze the following code and evaluate if it follows Clean Code principles:\n\
+            - Use meaningful and intention-revealing names\n\
+            - Functions should do one thing only and do it well\n\
+            - Keep functions small (preferably under 20 lines)\n\
+            - Arguments should be few (ideally 0-2, maximum 3)\n\
+            - Avoid side effects in functions\n\
+            - Don't repeat yourself (DRY)\n\
+            - Maintain clear separation of concerns\n\n\
+            For each principle, indicate whether the code follows it, with specific examples of good practices \
+            or violations found. Then provide actionable recommendations on how to improve the code to better \
+            follow Clean Code principles. Be constructive and specific. Include line numbers or function names \
+            in your recommendations whenever possible.\n\n\
+            Analyze these {} files (Batch #{}):\n{}",
+            batch_files.len(),
+            batch_number,
+            all_code
+        )
+    };
     
-    style::print_info(&format!("Analyzing code with AI (batch #{}: {} files)", 
+    style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
         batch_number, batch_files.len()));
     
     let analysis = model.generate_response(&prompt).await
@@ -152,13 +177,26 @@ async fn analyze_clean_code_batch(
 
 fn display_analysis_results(analysis: &str, elapsed: std::time::Duration) {
     println!("\n{}\n", render_markdown(analysis));
-    style::print_success(&format!("Clean code analysis completed in {:.2?}", elapsed));
+    style::print_success(&format!("✨ Clean code analysis completed in {:.2?}", elapsed));
 }
 
 fn export_analysis(content: &str, file_path: &str, batch_number: usize) -> AppResult<()> {
-    // Include the batch number in the output path
-    let output_name = format!("clean-code-batch{}", batch_number);
-    let path = crate::output::path::resolve_output_path(&output_name, file_path, "md")?;
+    use chrono::Local;
+    use std::path::Path;
+    
+    // Get the directory name from file_path
+    let dir_name = Path::new(file_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown")
+        .replace(".", "_");
+    
+    // Include the directory name, batch number, and timestamp in the output path
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let output_name = format!("clean-code-analyze");
+    let file_name = format!("{}_{}_batch{}", dir_name, timestamp, batch_number);
+    
+    let path = crate::output::path::resolve_output_path(&output_name, &file_name, "md")?;
     
     std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 
@@ -166,6 +204,6 @@ fn export_analysis(content: &str, file_path: &str, batch_number: usize) -> AppRe
             message: format!("Error writing clean code analysis: {}", error) 
         })?;
     
-    style::print_success(&format!("Clean code analysis batch #{} exported to {}", batch_number, path.display()));
+    style::print_success(&format!("📄 Clean code analysis batch #{} exported to {}", batch_number, path.display()));
     Ok(())
 }

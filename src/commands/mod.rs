@@ -153,6 +153,10 @@ pub enum Commands {
         /// AI model tier to use (low, medium, high)
         #[arg(long, default_value = "medium")]
         ai_level: String,
+        
+        /// Focus only on violations and recommendations (skip positive feedback)
+        #[arg(long)]
+        only_recommendations: bool,
     },
 }
 
@@ -169,7 +173,7 @@ pub async fn execute(cli: Cli) -> i32 {
             describe::execute(path, no_output, output_path, no_parallel).await,
         Commands::DeleteComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
             delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
-        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level } => 
-            clean_code_analyze::execute(path, output_path, no_parallel, ai_level).await,
+        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level, only_recommendations } => 
+            clean_code_analyze::execute(path, output_path, no_parallel, ai_level, only_recommendations).await,
     }
 }
