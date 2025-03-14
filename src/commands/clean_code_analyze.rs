@@ -18,6 +18,13 @@ struct CleanCodeConfig {
     only_recommendations: bool,
 }
 
+/// Analysis configuration for a single batch
+struct BatchAnalysisConfig<'a> {
+    batch: &'a FileBatch<'a>,
+    model: Arc<dyn crate::ai::AiModel>,
+    only_recommendations: bool,
+}
+
 /// Result of a batch analysis
 struct BatchAnalysisResult {
     content: String,
@@ -152,12 +159,15 @@ async fn process_all_batches(
     config: &CleanCodeConfig
 ) -> AppResult<()> {
     for batch in batches {
+        // Create batch analysis config
+        let batch_config = BatchAnalysisConfig {
+            batch,
+            model: model.clone(),
+            only_recommendations: config.only_recommendations,
+        };
+        
         // Analyze the batch
-        let batch_result = analyze_code_batch(
-            batch, 
-            model.clone(), 
-            config.only_recommendations
-        ).await?;
+        let batch_result = analyze_code_batch(&batch_config).await?;
         
         // Display and export results
         process_batch_results(&batch_result, config)?;
@@ -201,11 +211,9 @@ fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
         .collect()
 }
 
-async fn analyze_code_batch(
-    batch: &FileBatch<'_>,
-    model: Arc<dyn crate::ai::AiModel>,
-    only_recommendations: bool
-) -> AppResult<BatchAnalysisResult> {
+async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<BatchAnalysisResult> {
+    let batch = config.batch;
+    
     style::print_info(&format!("⏳ Analyzing batch {}/{} ({} files)", 
         batch.batch_number, batch.batch_count, batch.files.len()));
     
@@ -219,14 +227,14 @@ async fn analyze_code_batch(
         &file_contents, 
         batch.batch_number, 
         batch.files.len(), 
-        only_recommendations
+        config.only_recommendations
     );
     
     style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
         batch.batch_number, batch.files.len()));
     
     // Generate AI analysis
-    let analysis = model.generate_response(&prompt).await
+    let analysis = config.model.generate_response(&prompt).await
         .map_err(|e| AppError::Ai(e))?;
     
     Ok(BatchAnalysisResult {
