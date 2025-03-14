@@ -142,10 +142,6 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
-        /// Disable auto-saving of the output file
-        #[arg(long)]
-        no_output: bool,
-        
         /// Custom output path (optional, uses default structured output if not specified)
         #[arg(short, long)]
         output_path: Option<String>,
@@ -173,7 +169,7 @@ pub async fn execute(cli: Cli) -> i32 {
             describe::execute(path, no_output, output_path, no_parallel).await,
         Commands::DeleteComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
             delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
-        Commands::CleanCodeAnalyze { path, no_output, output_path, no_parallel, ai_level } => 
-            clean_code_analyze::execute(path, no_output, output_path, no_parallel, ai_level).await,
+        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level } => 
+            clean_code_analyze::execute(path, output_path, no_parallel, ai_level).await,
     }
 }

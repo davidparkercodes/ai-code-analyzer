@@ -11,12 +11,11 @@ use std::sync::Arc;
 
 pub async fn execute(
     path: String, 
-    no_output: bool, 
     output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String
 ) -> i32 {
-    match execute_clean_code_analyze_command(path, no_output, output_path, no_parallel, ai_level).await {
+    match execute_clean_code_analyze_command(path, output_path, no_parallel, ai_level).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -24,7 +23,6 @@ pub async fn execute(
 
 async fn execute_clean_code_analyze_command(
     path: String, 
-    no_output: bool,
     custom_output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String
@@ -40,18 +38,47 @@ async fn execute_clean_code_analyze_command(
     let model = factory::create_ai_model(ai_config, tier)?;
     
     let start_time = Instant::now();
-    let analysis_result = analyze_clean_code(&analyzer, &path, model, parallel_enabled).await?;
+    let source_files = get_all_source_files(&path, parallel_enabled)
+        .map_err(|e| AppError::Analysis(format!("Error scanning directory: {}", e)))?;
     
-    display_analysis_results(&analysis_result, start_time);
-    
-    if !no_output {
-        if let Some(output_path) = custom_output_path {
-            export_analysis(&analysis_result, output_path)?;
-        } else {
-            let default_output = path.clone();
-            export_analysis(&analysis_result, default_output)?;
-        }
+    if source_files.is_empty() {
+        return Err(AppError::Analysis(format!("No source files found in {}", path)));
     }
+
+    style::print_info(&format!("Found {} source files to analyze", source_files.len()));
+    
+    // Process files in batches of 10
+    let batch_size = 10;
+    let batch_count = (source_files.len() + batch_size - 1) / batch_size; // Ceiling division
+    
+    style::print_info(&format!("Processing {} batches of up to {} files each", batch_count, batch_size));
+    
+    for batch_index in 0..batch_count {
+        let start_idx = batch_index * batch_size;
+        let end_idx = std::cmp::min(start_idx + batch_size, source_files.len());
+        let batch_files = &source_files[start_idx..end_idx];
+        
+        style::print_info(&format!("Processing batch {}/{} ({} files)", 
+            batch_index + 1, batch_count, batch_files.len()));
+        
+        let analysis_result = analyze_clean_code_batch(
+            &analyzer, batch_files, model.clone(), batch_index + 1
+        ).await?;
+        
+        display_analysis_results(&analysis_result, start_time.elapsed());
+        
+        // Always output to file
+        let output_path = if let Some(ref custom_path) = custom_output_path {
+            custom_path.clone()
+        } else {
+            path.clone()
+        };
+        
+        export_analysis(&analysis_result, &output_path, batch_index + 1)?;
+    }
+    
+    let elapsed = start_time.elapsed();
+    style::print_success(&format!("All batches processed in {:.2?}", elapsed));
     
     Ok(())
 }
@@ -80,26 +107,15 @@ fn parse_ai_level(level: &str) -> AppResult<ModelTier> {
     })
 }
 
-async fn analyze_clean_code(
+async fn analyze_clean_code_batch(
     _analyzer: &FileAnalyzer,
-    directory_path: &str,
+    batch_files: &[std::path::PathBuf],
     model: Arc<dyn crate::ai::AiModel>,
-    parallel: bool
+    batch_number: usize
 ) -> AppResult<String> {
-    let source_files = get_all_source_files(directory_path, parallel)
-        .map_err(|e| AppError::Analysis(format!("Error scanning directory: {}", e)))?;
-    
-    if source_files.is_empty() {
-        return Err(AppError::Analysis(format!("No source files found in {}", directory_path)));
-    }
-
-    style::print_info(&format!("Found {} source files to analyze", source_files.len()));
-    
     let mut all_code = String::new();
-    let max_files = 10; // Limit to prevent exceeding AI context limits
-    let analyzed_files = source_files.iter().take(max_files).collect::<Vec<_>>();
     
-    for file_path in &analyzed_files {
+    for file_path in batch_files {
         let file_content = fs::read_to_string(file_path)
             .map_err(|e| AppError::Analysis(format!("Error reading file {}: {}", file_path.display(), e)))?;
         
@@ -119,12 +135,14 @@ async fn analyze_clean_code(
         or violations found. Then provide actionable recommendations on how to improve the code to better \
         follow Clean Code principles. Be constructive and specific. Include line numbers or function names \
         in your recommendations whenever possible.\n\n\
-        Analyze {} files, noting this is a subset of the codebase:\n{}",
-        analyzed_files.len(),
+        Analyze these {} files (Batch #{}):\n{}",
+        batch_files.len(),
+        batch_number,
         all_code
     );
     
-    style::print_info(&format!("Analyzing code with AI (analyzing {} files)", analyzed_files.len()));
+    style::print_info(&format!("Analyzing code with AI (batch #{}: {} files)", 
+        batch_number, batch_files.len()));
     
     let analysis = model.generate_response(&prompt).await
         .map_err(|e| AppError::Ai(e))?;
@@ -132,14 +150,15 @@ async fn analyze_clean_code(
     Ok(analysis)
 }
 
-fn display_analysis_results(analysis: &str, start_time: Instant) {
-    let elapsed = start_time.elapsed();
+fn display_analysis_results(analysis: &str, elapsed: std::time::Duration) {
     println!("\n{}\n", render_markdown(analysis));
     style::print_success(&format!("Clean code analysis completed in {:.2?}", elapsed));
 }
 
-fn export_analysis(content: &str, file_path: String) -> AppResult<()> {
-    let path = crate::output::path::resolve_output_path("clean-code", &file_path, "md")?;
+fn export_analysis(content: &str, file_path: &str, batch_number: usize) -> AppResult<()> {
+    // Include the batch number in the output path
+    let output_name = format!("clean-code-batch{}", batch_number);
+    let path = crate::output::path::resolve_output_path(&output_name, file_path, "md")?;
     
     std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 
@@ -147,6 +166,6 @@ fn export_analysis(content: &str, file_path: String) -> AppResult<()> {
             message: format!("Error writing clean code analysis: {}", error) 
         })?;
     
-    style::print_success(&format!("Clean code analysis exported to {}", path.display()));
+    style::print_success(&format!("Clean code analysis batch #{} exported to {}", batch_number, path.display()));
     Ok(())
 }
