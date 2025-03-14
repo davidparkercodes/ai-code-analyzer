@@ -40,13 +40,13 @@ pub async fn execute(
     ai_level: String,
     only_recommendations: bool
 ) -> i32 {
-    match run_command(path, output_path, no_parallel, ai_level, only_recommendations).await {
+    match execute_clean_code_analysis(path, output_path, no_parallel, ai_level, only_recommendations).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
 }
 
-async fn run_command(
+async fn execute_clean_code_analysis(
     path: String, 
     custom_output_path: Option<String>, 
     no_parallel: bool,
@@ -69,7 +69,7 @@ async fn run_command(
     let source_files = scan_source_files(&config.path, config.parallel_enabled)?;
     
     // Process files in batches
-    process_file_batches(&config, &source_files, model).await
+    analyze_code_in_batches(&config, &source_files, model).await
 }
 
 fn prepare_command_config(
@@ -117,7 +117,7 @@ fn scan_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBu
     Ok(source_files)
 }
 
-async fn process_file_batches(
+async fn analyze_code_in_batches(
     config: &CleanCodeConfig,
     source_files: &[PathBuf],
     model: Arc<dyn crate::ai::AiModel>
@@ -129,7 +129,7 @@ async fn process_file_batches(
         batches.len(), batches.first().map_or(0, |b| b.files.len())));
     
     for batch in batches {
-        let batch_result = process_single_batch(
+        let batch_result = analyze_code_batch(
             &batch, 
             model.clone(), 
             config.only_recommendations
@@ -168,12 +168,12 @@ fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
         .collect()
 }
 
-async fn process_single_batch(
+async fn analyze_code_batch(
     batch: &FileBatch<'_>,
     model: Arc<dyn crate::ai::AiModel>,
     only_recommendations: bool
 ) -> AppResult<BatchAnalysisResult> {
-    style::print_info(&format!("⏳ Processing batch {}/{} ({} files)", 
+    style::print_info(&format!("⏳ Analyzing batch {}/{} ({} files)", 
         batch.batch_number, batch.batch_count, batch.files.len()));
     
     let start_time = Instant::now();
