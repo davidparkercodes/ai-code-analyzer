@@ -108,7 +108,7 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
     match analyze_level {
         "low" => {
             "MINIMAL STRICTNESS MODE INSTRUCTIONS:\n\
-            1. Conduct a fair, balanced review without bias toward strongs or weaknesses\n\
+            1. Conduct a fair, balanced review without bias toward strengths or weaknesses\n\
             2. Only mention the most significant clean code violations, if any\n\
             3. It is entirely appropriate to note that well-structured code has no significant issues\n\
             4. Limit recommendations to only the most critical issues (1-2 at most)\n\
@@ -120,11 +120,11 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
             2. Consider even minor violations and stylistic improvements\n\
             3. Provide up to 4-5 recommendations per principle where appropriate\n\
             4. Look for subtle optimization opportunities and design pattern improvements\n\
-            5. Be specific and detailed in your analysis of both strongs and weaknesses"
+            5. Be specific and detailed in your analysis of both strengths and weaknesses"
         },
         _ => {
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
-            1. Be balanced in your analysis, covering both strongs and weaknesses\n\
+            1. Be balanced in your analysis, covering both strengths and weaknesses\n\
             2. Provide actionable recommendations only for significant issues (medium or high impact)\n\
             3. Limit recommendations to a maximum of 2-3 per principle\n\
             4. DO NOT force recommendations when they aren't needed - it's acceptable to praise good code\n\

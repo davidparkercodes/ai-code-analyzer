@@ -407,11 +407,36 @@ async fn analyze_code_batch(
         .await
         .map_err(|e| AppError::Ai(e))?;
 
+    // Add some debug information about the AI response
+    if analysis.trim().is_empty() {
+        style::print_warning("AI returned empty response");
+    } else if !analysis.trim().starts_with("[") {
+        style::print_warning("AI response doesn't start with '[' - might not be valid JSON");
+    }
+    
     let elapsed = start_time.elapsed();
     style::print_info(&format!("⌛ AI analysis completed in {:.2?}", elapsed));
+    
+    // Ensure the response is valid JSON array
+    let processed_analysis = if !analysis.trim().starts_with("[") {
+        // Try to extract JSON from possibly markdown response
+        if let Some(start) = analysis.find("[") {
+            if let Some(end) = analysis.rfind("]") {
+                let json_str = &analysis[start..=end];
+                style::print_info("Extracted JSON from mixed response");
+                json_str.to_string()
+            } else {
+                analysis
+            }
+        } else {
+            analysis
+        }
+    } else {
+        analysis
+    };
 
     Ok(Some(BatchAnalysisResult {
-        content: analysis,
+        content: processed_analysis,
         batch_number: batch.batch_number,
     }))
 }
@@ -539,7 +564,7 @@ fn log_analyze_level(level: &AnalyzeLevel) {
 /// Parse JSON from string into a serde_json::Value
 fn parse_analysis_json(content: &str) -> Result<serde_json::Value, String> {
     serde_json::from_str(content)
-        .map_err(|e| format\!("Failed to parse JSON response: {}", e))
+        .map_err(|e| format!("Failed to parse JSON response: {}", e))
 }
 
 /// Create ordered actionable items from unordered JSON
@@ -562,9 +587,9 @@ fn extract_strong_points(
         return None;
     }
     
-    let strongs = map.get("strongPoints")?;
-    if let serde_json::Value::Array(strongs_array) = strongs {
-        let points: Vec<String> = strongs_array.iter()
+    let strong_points = map.get("strongPoints")?;
+    if let serde_json::Value::Array(strong_points_array) = strong_points {
+        let points: Vec<String> = strong_points_array.iter()
             .filter_map(|s| s.as_str().map(|str| str.to_string()))
             .collect();
         
@@ -634,7 +659,7 @@ fn export_batch_analysis(
     let json_value = match parse_analysis_json(content) {
         Ok(value) => value,
         Err(message) => {
-            style::print_warning(&format\!("Invalid JSON response: {}", message));
+            style::print_warning(&format!("Invalid JSON response: {}", message));
             return Err(AppError::Analysis(message));
         }
     };
