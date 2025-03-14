@@ -354,8 +354,17 @@ fn clean_file_content(
     let mut result = String::with_capacity(content.len());
     
     for line in content.lines() {
+        let trimmed = line.trim_start();
+        
+        // Check if line is entirely blank (preserve it)
+        if line.trim().is_empty() {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
         // Skip triple-slash comments (documentation comments)
-        if line.trim_start().starts_with("///") {
+        if trimmed.starts_with("///") {
             result.push_str(line);
             result.push('\n');
             continue;
@@ -368,16 +377,36 @@ fn clean_file_content(
             continue;
         }
         
-        // Parse the line to find string literals and only remove comments outside of them
-        let processed_line = if let Some(processed) = process_line_preserving_strings(line, comment_regex, comment_count) {
-            processed
-        } else {
-            line.to_string()
-        };
+        // Any line with a backslash is likely part of a multiline string or has a line continuation
+        // For safety, don't try to modify these lines at all - preserves multiline strings
+        if line.contains('\\') {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
         
-        // Add the processed line if it's not empty
-        if !processed_line.trim().is_empty() {
-            result.push_str(&processed_line);
+        // For any line containing raw string markers, keep it intact to avoid problems
+        if line.contains("r#") {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+        
+        // Check if this is a standalone comment line (starts with //)
+        if trimmed.starts_with("//") && !trimmed.starts_with("///") {
+            // This is a standalone comment, count it and skip it
+            *comment_count += 1;
+            continue;
+        }
+        
+        // For all other lines, handle comments while preserving string literals
+        if let Some(cleaned_line) = process_line_preserving_strings(line, comment_regex, comment_count) {
+            // Line had an end-of-line comment that was removed
+            result.push_str(&cleaned_line);
+            result.push('\n');
+        } else {
+            // Line had no comments, keep it unchanged
+            result.push_str(line);
             result.push('\n');
         }
     }
@@ -395,11 +424,11 @@ fn display_clean_results(stats: &CleanStats, start_time: Instant) {
     style::print_success(&format!("Cleaning completed in {:.2?}", elapsed));
 }
 
-/// Process a line of code, preserving string literals while removing comments outside them
+/// Process a line of code, preserving string literals while removing end-of-line comments
+/// Returns Some(cleaned_line) if a comment was found and removed, None if no comments were found
 fn process_line_preserving_strings(line: &str, _comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
     // State tracking for string parsing
     let mut in_string = false;
-    let mut in_raw_string = false;
     let mut escape_next = false;
     let chars = line.chars().collect::<Vec<_>>();
     let length = chars.len();
@@ -424,103 +453,109 @@ fn process_line_preserving_strings(line: &str, _comment_regex: &Regex, comment_c
             
             // Handle string literals with double quotes
             '"' => {
-                // Handle raw strings (r#"..."#)
-                if i > 0 && chars[i-1] == 'r' && !in_string && !in_raw_string {
-                    in_raw_string = true;
-                    continue;
-                }
-                
-                // Toggle normal string state if not in a raw string
-                if !in_raw_string {
-                    in_string = !in_string;
-                }
-            },
-            
-            // Handle closing of raw strings
-            '#' if in_raw_string && i > 0 && chars[i-1] == '"' => {
-                in_raw_string = false;
+                // Toggle string state (this is a simplification, but works for most cases
+                // since we're now separately handling multiline strings and raw strings)
+                in_string = !in_string;
             },
             
             // Detect comments outside of string literals
-            '/' if i + 1 < length && chars[i+1] == '/' && !in_string && !in_raw_string => {
-                comment_pos = Some(i);
-                break;
+            '/' if i + 1 < length && chars[i+1] == '/' && !in_string => {
+                // Make sure this is not at start of line (those are handled separately)
+                let prefix = &line[0..i];
+                if !prefix.trim().is_empty() {
+                    // Found an end-of-line comment that's not in a string
+                    comment_pos = Some(i);
+                    break;
+                }
             },
             
             _ => {}
         }
     }
     
-    // If we found a comment outside string literals, remove it
+    // If we found an end-of-line comment outside string literals, remove it
     if let Some(pos) = comment_pos {
         *comment_count += 1;
-        let cleaned = line[0..pos].trim_end();
-        
-        if cleaned.is_empty() {
-            return None; // Entire line was a comment
-        }
-        
-        return Some(cleaned.to_string());
+        let cleaned = line[0..pos].trim_end().to_string();
+        return Some(cleaned);
     }
     
-    // No comments found or they were inside string literals
+    // No end-of-line comments found or they were inside string literals
     None
 }
 
 fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
-    // Find the differences between original and cleaned content
+    // Parse the original and cleaned content into lines
     let original_lines: Vec<&str> = original.lines().collect();
     let cleaned_lines: Vec<&str> = cleaned.lines().collect();
-    
-    // For each original line, check if it's in the cleaned content
-    // If not, it was likely a comment-only line that was removed
-    // If it's different, it likely had a comment at the end that was removed
     
     const MAX_PREVIEW_LINES: usize = 5; // Limit preview to first 5 changes
     let mut preview_count = 0;
     
     println!("\n{}", style::bold(&format!("Preview of changes for {}", file_path)));
     
-    // Compare up to the smaller of the two line counts
-    let min_lines = std::cmp::min(original_lines.len(), cleaned_lines.len());
+    // Track positions in both arrays
+    let mut orig_pos = 0;
+    let mut clean_pos = 0;
     
-    for i in 0..min_lines {
-        // If lines differ, show the difference
-        if original_lines[i] != cleaned_lines[i] && preview_count < MAX_PREVIEW_LINES {
-            let original_line = original_lines[i];
-            let cleaned_line = cleaned_lines[i];
+    // Comparison algorithm that handles line removals properly
+    while orig_pos < original_lines.len() && preview_count < MAX_PREVIEW_LINES {
+        let original_line = original_lines[orig_pos];
+        
+        // Check if it's a standalone comment line to be removed
+        if original_line.trim_start().starts_with("//") && 
+           !original_line.trim_start().starts_with("///") && 
+           !original_line.contains("aicodeanalyzer: ignore") {
+            // This is a standalone comment being removed
+            println!("- {}", style::dimmed(original_line));
+            orig_pos += 1;
+            preview_count += 1;
+            continue;
+        }
+        
+        // Check if there's a matching line in the cleaned file
+        if clean_pos < cleaned_lines.len() {
+            let cleaned_line = cleaned_lines[clean_pos];
             
-            if cleaned_line.trim().is_empty() {
-                // Line was completely removed (was only a comment)
-                println!("- {}", style::dimmed(original_line));
-            } else {
-                // Part of the line was removed (comment at the end)
+            // Check if lines are different (indicates end-of-line comment removal)
+            if original_line != cleaned_line && 
+               // Make sure it's actually a comment difference, not blank line
+               (original_line.contains("//") || cleaned_line.contains("//")) {
                 println!("- {}", style::dimmed(original_line));
                 println!("+ {}", style::success(cleaned_line));
-            }
-            
-            preview_count += 1;
-        }
-    }
-    
-    // Check for lines completely removed (original had more lines than cleaned)
-    if original_lines.len() > cleaned_lines.len() {
-        for i in min_lines..original_lines.len() {
-            if preview_count < MAX_PREVIEW_LINES {
-                println!("- {}", style::dimmed(original_lines[i]));
+                orig_pos += 1;
+                clean_pos += 1;
                 preview_count += 1;
-            } else {
-                break;
+                continue;
             }
+        }
+        
+        // Move to next lines if no differences
+        orig_pos += 1;
+        clean_pos += 1;
+    }
+    
+    // Count total changes for summary
+    let mut total_line_changes = 0;
+    
+    // Count standalone comment lines
+    for line in original_lines.iter() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") && !trimmed.starts_with("///") && !line.contains("aicodeanalyzer: ignore") {
+            total_line_changes += 1;
         }
     }
     
-    // If there are more changes than the preview limit, show a message
-    let total_changes = original_lines.len() - cleaned_lines.len() + 
-                      (0..min_lines).filter(|&i| original_lines[i] != cleaned_lines[i]).count();
+    // Count end-of-line comment removals
+    for i in 0..std::cmp::min(original_lines.len(), cleaned_lines.len()) {
+        if original_lines[i] != cleaned_lines[i] {
+            total_line_changes += 1;
+        }
+    }
     
-    if total_changes > MAX_PREVIEW_LINES {
-        println!("... and {} more changes", total_changes - MAX_PREVIEW_LINES);
+    // Display summary if there are more changes than the preview
+    if total_line_changes > MAX_PREVIEW_LINES {
+        println!("... and {} more changes", total_line_changes - MAX_PREVIEW_LINES);
     }
     
     println!();
