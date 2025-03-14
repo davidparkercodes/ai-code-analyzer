@@ -61,7 +61,6 @@ async fn execute_clean_code_analysis(
     ai_level: String,
     only_recommendations: bool
 ) -> AppResult<()> {
-    // Parse configuration
     let config = prepare_command_config(
         path, 
         custom_output_path.unwrap_or_default(), 
@@ -70,13 +69,10 @@ async fn execute_clean_code_analysis(
         only_recommendations
     )?;
     
-    // Initialize AI model
     let model = initialize_ai_model(&config.model_tier)?;
     
-    // Scan for source files
     let source_files = scan_source_files(&config.path, config.parallel_enabled)?;
     
-    // Process files in batches
     analyze_code_in_batches(&config, &source_files, model).await
 }
 
@@ -112,13 +108,10 @@ fn initialize_ai_model(tier: &ModelTier) -> AppResult<Arc<dyn crate::ai::AiModel
 fn scan_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBuf>> {
     let start_time = Instant::now();
     
-    // Get source files
     let source_files = get_source_files(path, parallel_enabled)?;
     
-    // Validate source files
     validate_source_files(&source_files, path)?;
 
-    // Log results
     log_scan_results(&source_files, start_time.elapsed());
     
     Ok(source_files)
@@ -152,14 +145,11 @@ async fn analyze_code_in_batches(
 ) -> AppResult<()> {
     let start_time = Instant::now();
     
-    // Create batches
     let batches = create_file_batches(source_files);
     log_batch_processing_start(&batches);
     
-    // Process each batch
     process_all_batches(&batches, model, config).await?;
     
-    // Log completion
     log_processing_complete(start_time.elapsed());
     Ok(())
 }
@@ -180,17 +170,14 @@ async fn process_all_batches(
     config: &CleanCodeConfig
 ) -> AppResult<()> {
     for batch in batches {
-        // Create batch analysis config
         let batch_config = BatchAnalysisConfig {
             batch,
             model: model.clone(),
             only_recommendations: config.only_recommendations,
         };
         
-        // Analyze the batch
         let batch_result = analyze_code_batch(&batch_config).await?;
         
-        // Display and export results
         process_batch_results(&batch_result, config)?;
     }
     
@@ -201,10 +188,8 @@ fn process_batch_results(
     result: &BatchAnalysisResult,
     config: &CleanCodeConfig
 ) -> AppResult<()> {
-    // Display results
     display_batch_results(result);
     
-    // Export to file
     export_batch_analysis(
         &result.content, 
         &config.output_path, 
@@ -215,7 +200,7 @@ fn process_batch_results(
 
 fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
     let batch_size = 10;
-    let batch_count = (source_files.len() + batch_size - 1) / batch_size; // Ceiling division
+    let batch_count = (source_files.len() + batch_size - 1) / batch_size;
     
     (0..batch_count)
         .map(|batch_index| {
@@ -240,10 +225,8 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
     
     let start_time = Instant::now();
     
-    // Collect file contents
     let file_contents = collect_file_contents(batch.files)?;
     
-    // Create AI prompt
     let prompt = create_ai_prompt(
         &file_contents, 
         batch.batch_number, 
@@ -254,7 +237,6 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
     style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
         batch.batch_number, batch.files.len()));
     
-    // Generate AI analysis
     let analysis = config.model.generate_response(&prompt).await
         .map_err(|e| AppError::Ai(e))?;
     
@@ -337,13 +319,10 @@ fn export_batch_analysis(
     batch_number: usize, 
     model_tier: &ModelTier
 ) -> AppResult<()> {
-    // Generate the output path
     let path = generate_output_path(base_path, batch_number, model_tier)?;
     
-    // Write analysis to file
     write_analysis_to_file(&path, content)?;
     
-    // Log success
     log_export_success(batch_number, &path);
     
     Ok(())
@@ -356,14 +335,12 @@ fn generate_output_path(
 ) -> AppResult<std::path::PathBuf> {
     use chrono::Local;
     
-    // Get the directory name from base_path
     let dir_name = Path::new(base_path)
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("unknown")
         .replace(".", "_");
     
-    // Create filename with directory name, batch number, AI level, and timestamp
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
     let file_name = format!(

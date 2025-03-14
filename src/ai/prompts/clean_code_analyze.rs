@@ -5,10 +5,8 @@ pub fn create_clean_code_prompt(
     file_count: usize,
     only_recommendations: bool,
 ) -> String {
-    // Concatenate file contents
     let all_code = concatenate_file_contents(file_contents);
     
-    // Create appropriate prompt based on mode
     create_prompt(only_recommendations, all_code, batch_number, file_count)
 }
 

@@ -122,7 +122,6 @@ fn visit_dirs(dir: &Path, source_files: &mut Vec<PathBuf>) -> std::io::Result<()
             let path = entry.path();
             
             if path.is_dir() {
-                // Skip common excluded directories
                 let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
                 if dir_name == "node_modules" || dir_name == "target" || dir_name == ".git" {
                     continue;
@@ -139,7 +138,6 @@ fn visit_dirs(dir: &Path, source_files: &mut Vec<PathBuf>) -> std::io::Result<()
 fn get_source_files_parallel(root_path: &Path) -> std::io::Result<Vec<PathBuf>> {
     let source_files = Arc::new(Mutex::new(Vec::new()));
     
-    // First get all the directories to process
     let mut dirs_to_process = Vec::new();
     dirs_to_process.push(root_path.to_path_buf());
     
@@ -161,7 +159,6 @@ fn get_source_files_parallel(root_path: &Path) -> std::io::Result<Vec<PathBuf>> 
         dirs_to_process.push(entry.path().to_path_buf());
     }
     
-    // Process each directory in parallel
     dirs_to_process.into_par_iter().for_each(|dir| {
         let mut local_files = Vec::new();
         if let Err(_) = visit_dirs(&dir, &mut local_files) {
