@@ -264,15 +264,24 @@ fn create_ai_prompt(
     only_recommendations: bool
 ) -> String {
     // Concatenate file contents
-    let all_code = file_contents.iter()
+    let all_code = concatenate_file_contents(file_contents);
+    
+    // Create appropriate prompt based on mode
+    create_prompt(only_recommendations, all_code, batch_number, file_count)
+}
+
+fn concatenate_file_contents(file_contents: &[(String, String)]) -> String {
+    file_contents.iter()
         .map(|(path, content)| format!("\n\n// File: {}\n{}", path, content))
         .collect::<Vec<_>>()
-        .join("");
-    
+        .join("")
+}
+
+fn create_prompt(only_recommendations: bool, code: String, batch_number: usize, file_count: usize) -> String {
     if only_recommendations {
-        create_recommendations_prompt(all_code, batch_number, file_count)
+        create_recommendations_prompt(code, batch_number, file_count)
     } else {
-        create_full_analysis_prompt(all_code, batch_number, file_count)
+        create_full_analysis_prompt(code, batch_number, file_count)
     }
 }
 
