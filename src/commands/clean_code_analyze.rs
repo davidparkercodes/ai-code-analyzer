@@ -375,6 +375,23 @@ fn export_batch_analysis(
     batch_number: usize, 
     model_tier: &ModelTier
 ) -> AppResult<()> {
+    // Generate the output path
+    let path = generate_output_path(base_path, batch_number, model_tier)?;
+    
+    // Write analysis to file
+    write_analysis_to_file(&path, content)?;
+    
+    // Log success
+    log_export_success(batch_number, &path);
+    
+    Ok(())
+}
+
+fn generate_output_path(
+    base_path: &str, 
+    batch_number: usize, 
+    model_tier: &ModelTier
+) -> AppResult<std::path::PathBuf> {
     use chrono::Local;
     
     // Get the directory name from base_path
@@ -395,19 +412,21 @@ fn export_batch_analysis(
         timestamp
     );
     
-    let path = crate::output::path::resolve_output_path(output_name, &file_name, "md")?;
-    
-    std::fs::write(&path, content)
+    crate::output::path::resolve_output_path(output_name, &file_name, "md")
+}
+
+fn write_analysis_to_file(path: &std::path::Path, content: &str) -> AppResult<()> {
+    std::fs::write(path, content)
         .map_err(|error| AppError::FileSystem { 
-            path: path.clone(), 
+            path: path.to_path_buf(), 
             message: format!("Error writing clean code analysis: {}", error) 
-        })?;
-    
+        })
+}
+
+fn log_export_success(batch_number: usize, path: &std::path::Path) {
     style::print_success(&format!(
         "📄 Clean code analysis batch #{} exported to {}", 
         batch_number, 
         path.display()
     ));
-    
-    Ok(())
 }
