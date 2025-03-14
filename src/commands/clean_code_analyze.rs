@@ -347,11 +347,10 @@ fn generate_output_path(
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
     
-    // Format: dir-name_batch1_medium_actionable-only_timestamp
+    // Format: dir_batch1_medium_actionable-only_timestamp
     let file_name = if actionable_only {
         format!(
-            "{}-{}_batch{}_{}_{}_{}",
-            output_name,
+            "{}_batch{}_{}_{}_{}", 
             dir_name, 
             batch_number, 
             format!("{:?}", model_tier).to_lowercase(),
@@ -360,8 +359,7 @@ fn generate_output_path(
         )
     } else {
         format!(
-            "{}-{}_batch{}_{}_{}", 
-            output_name,
+            "{}_batch{}_{}_{}",
             dir_name, 
             batch_number, 
             format!("{:?}", model_tier).to_lowercase(), 
