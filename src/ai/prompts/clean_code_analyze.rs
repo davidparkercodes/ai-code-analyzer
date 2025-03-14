@@ -57,9 +57,10 @@ pub fn create_actionable_recommendations_prompt(code: String, batch_number: usiz
             2. Provide a MAXIMUM of 1-2 recommendations, and ONLY if they represent significant issues\n\
             3. It is EXPECTED to report 'No significant issues found' for well-structured code\n\
             4. DO NOT suggest minor improvements - focus only on clear, objective violations\n\
-            5. If the code follows clean code principles reasonably well, simply acknowledge it's good\n\n\
-            For well-structured code, respond ONLY with:\n\
-            'This code follows Clean Code principles well. No significant issues found.'\n"
+            5. If the code follows clean code principles reasonably well, simply acknowledge it's good\n\
+            6. Be generous with your scoring - assign higher scores (85-100) for code that follows most principles\n\n\
+            For well-structured code, start with your score followed by:\n\
+            'No significant issues found. The code follows clean code principles well.'\n"
         },
         "high" => {
             "COMPREHENSIVE STRICTNESS MODE INSTRUCTIONS:\n\
@@ -67,7 +68,9 @@ pub fn create_actionable_recommendations_prompt(code: String, batch_number: usiz
             2. Provide up to 5-8 recommendations total across all principles\n\
             3. Include recommendations for minor improvements and stylistic concerns\n\
             4. Be specific and detailed in your analysis and recommendations\n\
-            5. Consider both obvious violations and subtle optimization opportunities\n"
+            5. Consider both obvious violations and subtle optimization opportunities\n\
+            6. Be strict with your scoring - even well-structured code should not receive a perfect score\n\
+            7. The score should reflect that there's always room for improvement\n"
         },
         _ => { // Medium level (default)
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
@@ -75,7 +78,9 @@ pub fn create_actionable_recommendations_prompt(code: String, batch_number: usiz
             2. Provide a MAXIMUM of 3-5 recommendations total across all principles\n\
             3. Include ONLY medium or high impact issues - ignore minor stylistic concerns\n\
             4. It is ACCEPTABLE to report 'No significant issues found' if the code is well-structured\n\
-            5. Do not manufacture issues or force recommendations when none are needed\n"
+            5. Do not manufacture issues or force recommendations when none are needed\n\
+            6. Score moderately - well-structured code should receive scores in the 75-90 range\n\
+            7. Reserve scores above 90 for exceptional code with minimal issues\n"
         }
     };
     
@@ -87,9 +92,12 @@ pub fn create_actionable_recommendations_prompt(code: String, batch_number: usiz
         2. Include line numbers or function names in your recommendations\n\
         3. For each recommendation, explain the specific benefit the change would bring\n\
         4. Consider the existing patterns in the codebase before suggesting changes\n\n\
-        Recommendations format:\n\
-        - If issues exist: List the highest impact recommendations with clear rationale and benefit\n\
-        - If no significant issues: Simply state 'No significant issues found. The code follows clean code principles well.'\n\n\
+        REQUIRED OUTPUT FORMAT:\n\
+        - The FIRST line of your response MUST be exactly: \"Overall Clean Code Analyzation Score: [x]/100\" where [x] is a number from 0-100\n\
+        - If no score can be determined, use \"Overall Clean Code Analyzation Score: N/A/100\"\n\
+        - The score should reflect how well the code follows clean code principles, with 100 being perfect\n\
+        - Nothing else should appear on this first line\n\
+        - After the score line, continue with your recommendations or \"No significant issues found\"\n\n\
         Analyze these {} files (Batch #{}):\n{}",
         base_prompt,
         strictness_level,
@@ -109,7 +117,8 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
             2. Only mention the most significant clean code violations, if any\n\
             3. It is entirely appropriate to note that well-structured code has no significant issues\n\
             4. Limit recommendations to only the most critical issues (1-2 at most)\n\
-            5. For well-structured code, explicitly state that no significant issues were found\n"
+            5. For well-structured code, explicitly state that no significant issues were found\n\
+            6. Be generous with your scoring - assign higher scores (85-100) for code that follows most principles\n"
         },
         "high" => {
             "COMPREHENSIVE STRICTNESS MODE INSTRUCTIONS:\n\
@@ -117,7 +126,9 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
             2. Consider even minor violations and stylistic improvements\n\
             3. Provide up to 4-5 recommendations per principle where appropriate\n\
             4. Look for subtle optimization opportunities and design pattern improvements\n\
-            5. Be specific and detailed in your analysis of both strengths and weaknesses\n"
+            5. Be specific and detailed in your analysis of both strengths and weaknesses\n\
+            6. Be strict with your scoring - even well-structured code should not receive a perfect score\n\
+            7. The score should reflect that there's always room for improvement\n"
         },
         _ => { // Medium level (default)
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
@@ -125,7 +136,9 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
             2. Provide actionable recommendations only for significant issues (medium or high impact)\n\
             3. Limit recommendations to a maximum of 2-3 per principle\n\
             4. DO NOT force recommendations when they aren't needed - it's acceptable to praise good code\n\
-            5. Be realistic about what constitutes a 'violation' vs. an acceptable trade-off\n"
+            5. Be realistic about what constitutes a 'violation' vs. an acceptable trade-off\n\
+            6. Score moderately - well-structured code should receive scores in the 75-90 range\n\
+            7. Reserve scores above 90 for exceptional code with minimal issues\n"
         }
     };
     
@@ -136,6 +149,12 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
         1. For each principle, indicate whether the code follows it with specific examples\n\
         2. Include line numbers or function names in your recommendations whenever possible\n\
         3. Consider the nature of the codebase and its patterns before suggesting changes\n\n\
+        REQUIRED OUTPUT FORMAT:\n\
+        - The FIRST line of your response MUST be exactly: \"Overall Clean Code Analyzation Score: [x]/100\" where [x] is a number from 0-100\n\
+        - If no score can be determined, use \"Overall Clean Code Analyzation Score: N/A/100\"\n\
+        - The score should reflect how well the code follows clean code principles, with 100 being perfect\n\
+        - Nothing else should appear on this first line\n\
+        - After the score line, provide your detailed analysis based on the principles above\n\n\
         Analyze these {} files (Batch #{}):\n{}",
         base_prompt,
         strictness_level,
