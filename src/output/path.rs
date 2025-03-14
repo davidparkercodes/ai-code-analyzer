@@ -13,6 +13,30 @@ pub fn create_output_path(command_name: &str, root_dir_name: &str, extension: &s
     Ok(command_dir.join(filename))
 }
 
+pub fn resolve_output_path(command_name: &str, path: &str, extension: &str) -> AppResult<PathBuf> {
+    let dir_name = if path == "." {
+        std::env::current_dir()
+            .ok()
+            .and_then(|path| path.file_name().and_then(|name| name.to_str().map(String::from)))
+            .unwrap_or_else(|| "current_dir".to_string())
+    } else {
+        let path_buf = Path::new(path).to_path_buf();
+        if path_buf.is_dir() {
+            path_buf.file_name()
+                .and_then(|name| name.to_str().map(String::from))
+                .unwrap_or_else(|| "dir".to_string())
+        } else if path.starts_with('/') {
+            path_buf.file_name()
+                .and_then(|name| name.to_str().map(String::from))
+                .unwrap_or_else(|| "file".to_string())
+        } else {
+            path.to_string()
+        }
+    };
+    
+    create_output_path(command_name, &dir_name, extension)
+}
+
 pub fn ensure_base_output_dir() -> AppResult<PathBuf> {
     let output_dir = PathBuf::from("output");
     
@@ -55,15 +79,22 @@ pub fn ensure_command_subdirectory(parent_dir: &Path, command_name: &str) -> App
 }
 
 pub fn generate_output_filename(root_dir_name: &str, extension: &str) -> String {
-    let root_dir_basename = Path::new(root_dir_name)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(root_dir_name);
+    let dir_name = if root_dir_name == "." {
+        std::env::current_dir()
+            .ok()
+            .and_then(|path| path.file_name().and_then(|name| name.to_str().map(String::from)))
+            .unwrap_or_else(|| "current_dir".to_string())
+    } else {
+        Path::new(root_dir_name)
+            .file_name()
+            .and_then(|name| name.to_str().map(String::from))
+            .unwrap_or_else(|| root_dir_name.to_string())
+    };
     
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     
-    format!("{}_{}.{}", root_dir_basename, timestamp, extension)
+    format!("{}_{}.{}", dir_name, timestamp, extension)
 }

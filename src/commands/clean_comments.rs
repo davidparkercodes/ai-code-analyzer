@@ -13,13 +13,14 @@ use regex::Regex;
 pub fn execute(
     path: String, 
     language: String, 
-    output_dir: Option<String>, 
+    no_output: bool,
+    output_path: Option<String>, 
     no_parallel: bool,
     no_git: bool,
     force: bool,
     dry_run: bool
 ) -> i32 {
-    match execute_clean_comments_command(path, language, output_dir, no_parallel, no_git, force, dry_run) {
+    match execute_clean_comments_command(path, language, no_output, output_path, no_parallel, no_git, force, dry_run) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -28,7 +29,8 @@ pub fn execute(
 fn execute_clean_comments_command(
     path: String, 
     language: String,
-    output_dir: Option<String>,
+    no_output: bool,
+    output_path: Option<String>,
     no_parallel: bool,
     no_git: bool,
     force: bool,
@@ -50,7 +52,7 @@ fn execute_clean_comments_command(
             false
         };
         
-        if !is_git_repo && !force && output_dir.is_none() && !confirm_non_git_operation()? {
+        if !is_git_repo && !force && (output_path.is_none() && !no_output) && !confirm_non_git_operation()? {
             style::print_info("Operation cancelled by user.");
             return Ok(());
         }
@@ -62,11 +64,17 @@ fn execute_clean_comments_command(
     log_parallel_status(parallel_enabled);
     
     let start_time = Instant::now();
-    let stats = clean_comments(&path, &language, output_dir.as_deref(), dry_run)?;
+    let effective_output_dir = if no_output {
+        None
+    } else {
+        output_path.as_deref()
+    };
+    
+    let stats = clean_comments(&path, &language, effective_output_dir, dry_run)?;
     
     display_clean_results(&stats, start_time);
     
-    if !dry_run && no_git == false && stats.changed_files > 0 && output_dir.is_none() {
+    if !dry_run && no_git == false && stats.changed_files > 0 && effective_output_dir.is_none() {
         let is_git_repo = check_git_repository(&path_buf)?;
         if is_git_repo {
             handle_git_operations(&path_buf)?;
@@ -230,7 +238,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         match output_dir {
             Some(dir) => {
                 if dir.starts_with('/') {
-                    // If absolute path, use it directly
                     let out_path = Path::new(&dir);
                     if !out_path.exists() {
                         fs::create_dir_all(out_path).map_err(|e| {
@@ -242,7 +249,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
                     }
                     Some(PathBuf::from(dir))
                 } else {
-                    // If relative path or just name, use structured path
                     let base_path = crate::output::path::ensure_base_output_dir()?;
                     let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
                     let clean_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "clean_comments")?;

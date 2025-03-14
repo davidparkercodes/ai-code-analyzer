@@ -5,10 +5,9 @@ use crate::ai::AiConfig;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
-use std::path::Path;
 
-pub async fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
-    match execute_describe_command(path, output, no_parallel).await {
+pub async fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
+    match execute_describe_command(path, no_output, output_path, no_parallel).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -16,7 +15,8 @@ pub async fn execute(path: String, output: Option<String>, no_parallel: bool) ->
 
 async fn execute_describe_command(
     path: String, 
-    output: Option<String>, 
+    no_output: bool,
+    custom_output_path: Option<String>, 
     no_parallel: bool
 ) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
@@ -32,8 +32,13 @@ async fn execute_describe_command(
     
     display_description_results(&description, start_time);
     
-    if let Some(output_path) = output {
-        export_description(&description, output_path)?;
+    if !no_output {
+        if let Some(output_path) = custom_output_path {
+            export_description(&description, output_path)?;
+        } else {
+            let default_output = path.clone();
+            export_description(&description, default_output)?;
+        }
     }
     
     Ok(())
@@ -77,13 +82,7 @@ fn display_description_results(description: &str, start_time: Instant) {
 }
 
 fn export_description(content: &str, file_path: String) -> AppResult<()> {
-    let path = if file_path.starts_with('/') {
-        // Absolute path specified, use as-is
-        Path::new(&file_path).to_path_buf()
-    } else {
-        // Relative path or just filename, use structured output path
-        crate::output::path::create_output_path("describe", &file_path, "md")?
-    };
+    let path = crate::output::path::resolve_output_path("describe", &file_path, "md")?;
     
     std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 

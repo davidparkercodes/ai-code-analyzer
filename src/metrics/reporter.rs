@@ -1,5 +1,7 @@
 use crate::metrics::models::CodeMetrics;
 use crate::output::style::*;
+use std::fs;
+use std::path::Path;
 
 pub struct MetricsReporter;
 
@@ -12,6 +14,60 @@ impl Default for MetricsReporter {
 impl MetricsReporter {
     pub fn new() -> Self {
         MetricsReporter
+    }
+    
+    pub fn export_metrics(&self, metrics: &CodeMetrics, output_path: impl AsRef<Path>) -> Result<(), String> {
+        let content = self.format_metrics_markdown(metrics);
+        
+        fs::write(output_path, content).map_err(|e| format!("Failed to write metrics file: {}", e))
+    }
+    
+    fn format_metrics_markdown(&self, metrics: &CodeMetrics) -> String {
+        let mut output = String::new();
+        
+        output.push_str("# Code Metrics Summary\n\n");
+        
+        output.push_str("## Overall Metrics\n\n");
+        output.push_str("| Metric | Value |\n");
+        output.push_str("|--------|-------|\n");
+        output.push_str(&format!("| Total Directories | {} |\n", metrics.total_directories));
+        output.push_str(&format!("| Total Files | {} |\n", metrics.total_files));
+        output.push_str(&format!("| Total Lines of Code | {} |\n", metrics.lines_of_code));
+        output.push_str(&format!("| Total Blank Lines | {} |\n", metrics.blank_lines));
+        output.push_str(&format!("| Total Comment Lines | {} |\n", metrics.comment_lines));
+        
+        output.push_str("\n## Production Code Metrics\n\n");
+        output.push_str("| Metric | Value |\n");
+        output.push_str("|--------|-------|\n");
+        output.push_str(&format!("| Files | {} |\n", metrics.prod_files));
+        output.push_str(&format!("| Lines of Code | {} |\n", metrics.prod_lines_of_code));
+        output.push_str(&format!("| Blank Lines | {} |\n", metrics.prod_blank_lines));
+        output.push_str(&format!("| Comment Lines | {} |\n", metrics.prod_comment_lines));
+        
+        output.push_str("\n## Test Code Metrics\n\n");
+        output.push_str("| Metric | Value |\n");
+        output.push_str("|--------|-------|\n");
+        output.push_str(&format!("| Files | {} |\n", metrics.test_files));
+        output.push_str(&format!("| Lines of Code | {} |\n", metrics.test_lines_of_code));
+        output.push_str(&format!("| Blank Lines | {} |\n", metrics.test_blank_lines));
+        output.push_str(&format!("| Comment Lines | {} |\n", metrics.test_comment_lines));
+        
+        if !metrics.by_language.is_empty() {
+            output.push_str("\n## Breakdown by Language\n\n");
+            output.push_str("| Language | Files | Lines of Code |\n");
+            output.push_str("|----------|-------|---------------|\n");
+            
+            let mut languages: Vec<(&String, &crate::metrics::models::LanguageMetrics)> =
+                metrics.by_language.iter().collect();
+            languages.sort_by(|a, b| b.1.lines_of_code.cmp(&a.1.lines_of_code));
+            
+            for (language, lang_metrics) in languages {
+                output.push_str(&format!("| {} | {} | {} |\n", 
+                    language, lang_metrics.files, lang_metrics.lines_of_code));
+            }
+        }
+        
+        output
     }
 
     pub fn report(&self, metrics: &CodeMetrics) {

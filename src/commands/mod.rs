@@ -33,6 +33,14 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
+        #[arg(short, long)]
+        output_path: Option<String>,
+        
         /// Disable parallel processing for large codebases
         #[arg(long)]
         no_parallel: bool,
@@ -43,9 +51,13 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
-        /// Output path for the DOT graph file (optional)
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
         #[arg(short, long)]
-        output: Option<String>,
+        output_path: Option<String>,
         
         /// Disable parallel processing for large codebases
         #[arg(long)]
@@ -57,9 +69,13 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
-        /// Output path for the style guide markdown file (optional)
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
         #[arg(short, long)]
-        output: Option<String>,
+        output_path: Option<String>,
         
         /// Disable parallel processing for large codebases
         #[arg(long)]
@@ -71,9 +87,13 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
-        /// Output path for the description markdown file (optional)
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
         #[arg(short, long)]
-        output: Option<String>,
+        output_path: Option<String>,
         
         /// Disable parallel processing for large codebases
         #[arg(long)]
@@ -90,9 +110,13 @@ pub enum Commands {
         #[arg(short, long, required = true)]
         language: String,
         
-        /// Output directory for cleaned files (optional, modifies files in-place if not provided)
+        /// Disable auto-saving of cleaned files to output directory
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output directory for cleaned files (optional, uses default structured output if not specified)
         #[arg(short, long)]
-        output: Option<String>,
+        output_path: Option<String>,
         
         /// Disable parallel processing for large codebases
         #[arg(long)]
@@ -115,11 +139,15 @@ pub enum Commands {
 pub async fn execute(cli: Cli) -> i32 {
     match cli.command {
         Commands::Run { path, no_parallel } => run::execute(path, no_parallel),
-        Commands::Metrics { path, no_parallel } => metrics::execute(path, no_parallel),
-        Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
-        Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
-        Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
-        Commands::CleanComments { path, language, output, no_parallel, no_git, force, dry_run } => 
-            clean_comments::execute(path, language, output, no_parallel, no_git, force, dry_run),
+        Commands::Metrics { path, no_output, output_path, no_parallel } => 
+            metrics::execute(path, no_output, output_path, no_parallel),
+        Commands::Dependencies { path, no_output, output_path, no_parallel } => 
+            dependencies::execute(path, no_output, output_path, no_parallel),
+        Commands::Style { path, no_output, output_path, no_parallel } => 
+            style::execute(path, no_output, output_path, no_parallel),
+        Commands::Describe { path, no_output, output_path, no_parallel } => 
+            describe::execute(path, no_output, output_path, no_parallel).await,
+        Commands::CleanComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
+            clean_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
     }
 }

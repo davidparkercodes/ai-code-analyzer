@@ -3,10 +3,9 @@ use crate::output::style;
 use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag};
 use std::time::Instant;
-use std::path::Path;
 
-pub fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
-    match execute_style_command(path, output, no_parallel) {
+pub fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
+    match execute_style_command(path, no_output, output_path, no_parallel) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -14,7 +13,8 @@ pub fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
 
 fn execute_style_command(
     path: String, 
-    output: Option<String>, 
+    no_output: bool,
+    custom_output_path: Option<String>, 
     no_parallel: bool
 ) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
@@ -28,8 +28,13 @@ fn execute_style_command(
     
     display_style_report(&report, start_time);
     
-    if let Some(output_path) = output {
-        export_style_guide(&report, output_path)?;
+    if !no_output {
+        if let Some(output_path) = custom_output_path {
+            export_style_guide(&report, output_path)?;
+        } else {
+            let default_output = path.clone();
+            export_style_guide(&report, default_output)?;
+        }
     }
     
     Ok(())
@@ -62,11 +67,7 @@ fn export_style_guide(report: &StyleReport, output_path: String) -> AppResult<()
 }
 
 fn write_style_guide_to_file(content: &str, file_path: &str) -> AppResult<()> {
-    let path = if file_path.starts_with('/') {
-        Path::new(file_path).to_path_buf()
-    } else {
-        crate::output::path::create_output_path("style", file_path, "md")?
-    };
+    let path = crate::output::path::resolve_output_path("style", file_path, "md")?;
     
     std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 

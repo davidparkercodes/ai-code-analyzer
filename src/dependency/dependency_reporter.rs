@@ -259,16 +259,11 @@ impl DependencyReporter {
     
     pub fn export_dot<P: AsRef<Path>>(&self, graph: &DependencyGraph, output_path: P) -> Result<(), String> {
         let dot_content = graph.to_dot_format();
-        let path_ref = output_path.as_ref();
-        let path_str = path_ref.to_str().unwrap_or("");
+        let path_str = output_path.as_ref().to_str().unwrap_or("");
         
-        let final_path = if path_str.starts_with('/') {
-            path_ref.to_path_buf()
-        } else {
-            match crate::output::path::create_output_path("dependencies", path_str, "dot") {
-                Ok(p) => p,
-                Err(e) => return Err(format!("Error creating output path: {}", e)),
-            }
+        let final_path = match crate::output::path::resolve_output_path("dependencies", path_str, "dot") {
+            Ok(p) => p,
+            Err(e) => return Err(format!("Error creating output path: {}", e)),
         };
         
         fs::write(&final_path, dot_content)
