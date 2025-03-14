@@ -79,12 +79,16 @@ pub enum Commands {
         #[arg(long)]
         no_parallel: bool,
     },
-    /// Clean double-slash comments from Rust files
+    /// Clean comments from source code files
     #[command(name = "clean-comments")]
     CleanComments {
         /// Path to analyze (defaults to current directory)
         #[arg(default_value = ".")]
         path: String,
+        
+        /// Programming language to clean comments from (currently only 'rust' is supported)
+        #[arg(short, long, required = true)]
+        language: String,
         
         /// Output directory for cleaned files (optional, modifies files in-place if not provided)
         #[arg(short, long)]
@@ -115,7 +119,7 @@ pub async fn execute(cli: Cli) -> i32 {
         Commands::Dependencies { path, output, no_parallel } => dependencies::execute(path, output, no_parallel),
         Commands::Style { path, output, no_parallel } => style::execute(path, output, no_parallel),
         Commands::Describe { path, output, no_parallel } => describe::execute(path, output, no_parallel).await,
-        Commands::CleanComments { path, output, no_parallel, no_git, force, dry_run } => 
-            clean_comments::execute(path, output, no_parallel, no_git, force, dry_run),
+        Commands::CleanComments { path, language, output, no_parallel, no_git, force, dry_run } => 
+            clean_comments::execute(path, language, output, no_parallel, no_git, force, dry_run),
     }
 }

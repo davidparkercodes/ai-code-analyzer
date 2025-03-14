@@ -12,13 +12,14 @@ use regex::Regex;
 
 pub fn execute(
     path: String, 
+    language: String, 
     output_dir: Option<String>, 
     no_parallel: bool,
     no_git: bool,
     force: bool,
     dry_run: bool
 ) -> i32 {
-    match execute_clean_comments_command(path, output_dir, no_parallel, no_git, force, dry_run) {
+    match execute_clean_comments_command(path, language, output_dir, no_parallel, no_git, force, dry_run) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -26,12 +27,20 @@ pub fn execute(
 
 fn execute_clean_comments_command(
     path: String, 
+    language: String,
     output_dir: Option<String>,
     no_parallel: bool,
     no_git: bool,
     force: bool,
     dry_run: bool
 ) -> AppResult<()> {
+    // Validate that the language is supported
+    if language.to_lowercase() != "rust" {
+        return Err(to_app_error(
+            format!("Language '{}' is not supported. Currently only 'rust' is supported.", language),
+            AppErrorType::Internal
+        ));
+    }
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let path_buf = PathBuf::from(&path);
     
@@ -50,11 +59,11 @@ fn execute_clean_comments_command(
         style::print_info("Running in dry-run mode. No files will be modified.");
     }
     
-    display_clean_header(&path);
+    display_clean_header(&path, &language);
     log_parallel_status(parallel_enabled);
     
     let start_time = Instant::now();
-    let stats = clean_comments(&path, output_dir.as_deref(), dry_run)?;
+    let stats = clean_comments(&path, &language, output_dir.as_deref(), dry_run)?;
     
     display_clean_results(&stats, start_time);
     
@@ -168,9 +177,9 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
-fn display_clean_header(directory_path: &str) {
-    style::print_header("Cleaning Double-Slash Comments");
-    style::print_info(&format!("Analyzing Rust files in directory: {}", directory_path));
+fn display_clean_header(directory_path: &str, language: &str) {
+    style::print_header(&format!("Cleaning Comments from {} Files", language.to_uppercase()));
+    style::print_info(&format!("Analyzing {} files in directory: {}", language, directory_path));
 }
 
 struct CleanStats {
@@ -179,7 +188,7 @@ struct CleanStats {
     removed_comments: usize,
 }
 
-fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<CleanStats> {
+fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<CleanStats> {
     let path = Path::new(directory_path);
     
     if !path.exists() {
@@ -195,11 +204,30 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool)
         removed_comments: 0,
     };
     
-    let comment_regex = Regex::new(r"//.+$").map_err(|e| {
+    // Configure language-specific settings
+    let (file_extension, comment_pattern, doc_comment_prefix, ignore_pattern) = match language.to_lowercase().as_str() {
+        "rust" => (
+            "rs",
+            r"//.+$",
+            "///",
+            r"//.*aicodeanalyzer:\s*ignore"
+        ),
+        // Add more language configurations here in the future
+        _ => {
+            return Err(to_app_error(
+                format!("Language '{}' is not supported.", language),
+                AppErrorType::Internal
+            ));
+        }
+    };
+    
+    // Compile regular expressions for the selected language
+    let comment_regex = Regex::new(comment_pattern).map_err(|e| {
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
-    let ignore_regex = Regex::new(r"//.*aicodeanalyzer:\s*ignore").map_err(|e| {
+    // Regular expression to detect ignore pattern
+    let ignore_regex = Regex::new(ignore_pattern).map_err(|e| {
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
@@ -224,12 +252,12 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool)
     };
     
     if path.is_file() {
-        if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+        if path.extension().and_then(|e| e.to_str()) == Some(file_extension) {
             if let Ok(content) = fs::read_to_string(path) {
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, &mut comment_count);
+                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -259,7 +287,8 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool)
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let file_path = entry.path();
             
-            if !file_path.is_file() || file_path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            // Check if the file has the correct extension for the language
+            if !file_path.is_file() || file_path.extension().and_then(|e| e.to_str()) != Some(file_extension) {
                 continue;
             }
             
@@ -271,7 +300,7 @@ fn clean_comments(directory_path: &str, output_dir: Option<&str>, dry_run: bool)
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, &mut comment_count);
+                let cleaned_content = clean_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -319,6 +348,7 @@ fn clean_file_content(
     content: &str, 
     comment_regex: &Regex, 
     ignore_regex: &Regex, 
+    doc_comment_prefix: &str,
     comment_count: &mut usize
 ) -> String {
     let mut result = String::with_capacity(content.len());
@@ -332,7 +362,8 @@ fn clean_file_content(
             continue;
         }
 
-        if trimmed.starts_with("///") {
+        // Check for documentation comments specific to the language
+        if trimmed.starts_with(doc_comment_prefix) {
             result.push_str(line);
             result.push('\n');
             continue;
