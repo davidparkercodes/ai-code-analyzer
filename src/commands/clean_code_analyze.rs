@@ -76,7 +76,7 @@ async fn execute_clean_code_analyze_command(
             path.clone()
         };
         
-        export_analysis(&analysis_result, &output_path, batch_index + 1)?;
+        export_analysis(&analysis_result, &output_path, batch_index + 1, &ai_level)?;
     }
     
     let elapsed = start_time.elapsed();
@@ -180,7 +180,7 @@ fn display_analysis_results(analysis: &str, elapsed: std::time::Duration) {
     style::print_success(&format!("✨ Clean code analysis completed in {:.2?}", elapsed));
 }
 
-fn export_analysis(content: &str, file_path: &str, batch_number: usize) -> AppResult<()> {
+fn export_analysis(content: &str, file_path: &str, batch_number: usize, ai_level: &str) -> AppResult<()> {
     use chrono::Local;
     use std::path::Path;
     
@@ -191,10 +191,14 @@ fn export_analysis(content: &str, file_path: &str, batch_number: usize) -> AppRe
         .unwrap_or("unknown")
         .replace(".", "_");
     
-    // Include the directory name, batch number, and timestamp in the output path
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    // Include the directory name, batch number, AI level, and timestamp in the output path
+    let timestamp = Local::now().timestamp();
     let output_name = format!("clean-code-analyze");
-    let file_name = format!("{}_{}_batch{}", dir_name, timestamp, batch_number);
+    let file_name = format!("{}_batch{}_{}_{}",
+        dir_name, 
+        batch_number, 
+        ai_level.to_lowercase(), 
+        timestamp);
     
     let path = crate::output::path::resolve_output_path(&output_name, &file_name, "md")?;
     
