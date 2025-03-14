@@ -55,15 +55,24 @@ pub fn ensure_command_subdirectory(parent_dir: &Path, command_name: &str) -> App
 }
 
 pub fn generate_output_filename(root_dir_name: &str, extension: &str) -> String {
-    let root_dir_basename = Path::new(root_dir_name)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(root_dir_name);
+    let dir_name = if root_dir_name == "." {
+        // For current directory, get the actual directory name
+        std::env::current_dir()
+            .ok()
+            .and_then(|path| path.file_name().and_then(|name| name.to_str().map(String::from)))
+            .unwrap_or_else(|| "current_dir".to_string())
+    } else {
+        // For other paths, extract the basename
+        Path::new(root_dir_name)
+            .file_name()
+            .and_then(|name| name.to_str().map(String::from))
+            .unwrap_or_else(|| root_dir_name.to_string())
+    };
     
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     
-    format!("{}_{}.{}", root_dir_basename, timestamp, extension)
+    format!("{}_{}.{}", dir_name, timestamp, extension)
 }
