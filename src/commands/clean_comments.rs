@@ -34,7 +34,6 @@ fn execute_clean_comments_command(
     force: bool,
     dry_run: bool
 ) -> AppResult<()> {
-    // Validate that the language is supported
     if language.to_lowercase() != "rust" {
         return Err(to_app_error(
             format!("Language '{}' is not supported. Currently only 'rust' is supported.", language),
@@ -204,7 +203,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         removed_comments: 0,
     };
     
-    // Configure language-specific settings
     let (file_extension, comment_pattern, doc_comment_prefix, ignore_pattern) = match language.to_lowercase().as_str() {
         "rust" => (
             "rs",
@@ -212,7 +210,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
             "///",
             r"//.*aicodeanalyzer:\s*ignore"
         ),
-        // Add more language configurations here in the future
         _ => {
             return Err(to_app_error(
                 format!("Language '{}' is not supported.", language),
@@ -221,12 +218,10 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         }
     };
     
-    // Compile regular expressions for the selected language
     let comment_regex = Regex::new(comment_pattern).map_err(|e| {
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
-    // Regular expression to detect ignore pattern
     let ignore_regex = Regex::new(ignore_pattern).map_err(|e| {
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
@@ -287,7 +282,6 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let file_path = entry.path();
             
-            // Check if the file has the correct extension for the language
             if !file_path.is_file() || file_path.extension().and_then(|e| e.to_str()) != Some(file_extension) {
                 continue;
             }
@@ -362,7 +356,6 @@ fn clean_file_content(
             continue;
         }
 
-        // Check for documentation comments specific to the language
         if trimmed.starts_with(doc_comment_prefix) {
             result.push_str(line);
             result.push('\n');
