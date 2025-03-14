@@ -157,6 +157,10 @@ pub enum Commands {
         /// Focus only on actionable, high-impact recommendations
         #[arg(long)]
         actionable_only: bool,
+        
+        /// Strictness level for analysis (low: minimal recommendations, medium: standard, high: comprehensive)
+        #[arg(long = "analyze-level", default_value = "medium")]
+        analyze_level: String,
     },
 }
 
@@ -173,7 +177,7 @@ pub async fn execute(cli: Cli) -> i32 {
             describe::execute(path, no_output, output_path, no_parallel).await,
         Commands::DeleteComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
             delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
-        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level, actionable_only } => 
-            clean_code_analyze::execute(path, output_path, no_parallel, ai_level, actionable_only).await,
+        Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level, actionable_only, analyze_level } => 
+            clean_code_analyze::execute(path, output_path, no_parallel, ai_level, actionable_only, analyze_level).await,
     }
 }

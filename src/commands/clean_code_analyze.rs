@@ -9,6 +9,41 @@ use std::time::{Instant, Duration};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::str::FromStr;
+
+/// Strictness level for code analysis
+#[derive(Debug, Clone)]
+enum AnalyzeLevel {
+    /// Minimal recommendations - only the most critical issues
+    Low,
+    /// Standard analysis with balanced approach
+    Medium,
+    /// Comprehensive analysis with detailed recommendations
+    High,
+}
+
+impl FromStr for AnalyzeLevel {
+    type Err = String;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "low" => Ok(AnalyzeLevel::Low),
+            "medium" => Ok(AnalyzeLevel::Medium),
+            "high" => Ok(AnalyzeLevel::High),
+            _ => Err(format!("Invalid analyze level: {}. Use 'low', 'medium', or 'high'", s))
+        }
+    }
+}
+
+impl std::fmt::Display for AnalyzeLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AnalyzeLevel::Low => write!(f, "low"),
+            AnalyzeLevel::Medium => write!(f, "medium"),
+            AnalyzeLevel::High => write!(f, "high"),
+        }
+    }
+}
 
 /// Configuration struct for the Clean Code Analyze command
 struct CleanCodeConfig {
@@ -17,6 +52,7 @@ struct CleanCodeConfig {
     parallel_enabled: bool,
     model_tier: ModelTier,
     actionable_only: bool,
+    analyze_level: AnalyzeLevel,
 }
 
 /// Analysis configuration for a single batch
@@ -24,6 +60,7 @@ struct BatchAnalysisConfig<'a> {
     batch: &'a FileBatch<'a>,
     model: Arc<dyn crate::ai::AiModel>,
     actionable_only: bool,
+    analyze_level: AnalyzeLevel,
 }
 
 /// Result of a batch analysis
@@ -46,9 +83,10 @@ pub async fn execute(
     output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level: String
 ) -> i32 {
-    match execute_clean_code_analysis(path, output_path, no_parallel, ai_level, actionable_only).await {
+    match execute_clean_code_analysis(path, output_path, no_parallel, ai_level, actionable_only, analyze_level).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -59,14 +97,16 @@ async fn execute_clean_code_analysis(
     custom_output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level_str: String
 ) -> AppResult<()> {
     let config = prepare_command_config(
         path, 
         custom_output_path.unwrap_or_default(), 
         no_parallel, 
         &ai_level, 
-        actionable_only
+        actionable_only,
+        &analyze_level_str
     )?;
     
     let model = initialize_ai_model(&config.model_tier)?;
@@ -81,14 +121,17 @@ fn prepare_command_config(
     custom_output_path: String,
     no_parallel: bool,
     ai_level: &str,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level_str: &str
 ) -> AppResult<CleanCodeConfig> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let model_tier = parse_model_tier(ai_level)?;
+    let analyze_level = parse_analyze_level(analyze_level_str)?;
     let output_path = if custom_output_path.is_empty() { path.clone() } else { custom_output_path };
     
     display_analysis_header(&path);
     log_parallel_status(parallel_enabled);
+    log_analyze_level(&analyze_level);
     
     Ok(CleanCodeConfig {
         path,
@@ -96,6 +139,7 @@ fn prepare_command_config(
         parallel_enabled,
         model_tier,
         actionable_only,
+        analyze_level,
     })
 }
 
@@ -174,6 +218,7 @@ async fn process_all_batches(
             batch,
             model: model.clone(),
             actionable_only: config.actionable_only,
+            analyze_level: config.analyze_level.clone(),
         };
         
         let batch_result = analyze_code_batch(&batch_config).await?;
@@ -195,7 +240,8 @@ fn process_batch_results(
         &config.output_path, 
         result.batch_number, 
         &config.model_tier,
-        config.actionable_only
+        config.actionable_only,
+        &config.analyze_level
     )
 }
 
@@ -232,7 +278,8 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
         &file_contents, 
         batch.batch_number, 
         batch.files.len(), 
-        config.actionable_only
+        config.actionable_only,
+        &config.analyze_level
     );
     
     style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
@@ -272,13 +319,15 @@ fn create_ai_prompt(
     file_contents: &[(String, String)], 
     batch_number: usize, 
     file_count: usize,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level: &AnalyzeLevel
 ) -> String {
     prompt::create_clean_code_prompt(
         file_contents,
         batch_number,
         file_count,
-        actionable_only
+        actionable_only,
+        analyze_level.to_string().as_str()
     )
 }
 
@@ -314,14 +363,31 @@ fn parse_model_tier(level: &str) -> AppResult<ModelTier> {
     })
 }
 
+fn parse_analyze_level(level: &str) -> AppResult<AnalyzeLevel> {
+    level.parse::<AnalyzeLevel>().map_err(|e| {
+        AppError::Analysis(format!("Invalid analyze level: {}. Use 'low', 'medium', or 'high'", e))
+    })
+}
+
+fn log_analyze_level(level: &AnalyzeLevel) {
+    let description = match level {
+        AnalyzeLevel::Low => "minimal (only critical issues)",
+        AnalyzeLevel::Medium => "standard (balanced approach)",
+        AnalyzeLevel::High => "comprehensive (detailed analysis)"
+    };
+    
+    style::print_info(&format!("🔍 Analysis strictness: {} - {}", level, description));
+}
+
 fn export_batch_analysis(
     content: &str, 
     base_path: &str, 
     batch_number: usize, 
     model_tier: &ModelTier,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level: &AnalyzeLevel
 ) -> AppResult<()> {
-    let path = generate_output_path(base_path, batch_number, model_tier, actionable_only)?;
+    let path = generate_output_path(base_path, batch_number, model_tier, actionable_only, analyze_level)?;
     
     write_analysis_to_file(&path, content)?;
     
@@ -334,7 +400,8 @@ fn generate_output_path(
     base_path: &str, 
     batch_number: usize, 
     model_tier: &ModelTier,
-    actionable_only: bool
+    actionable_only: bool,
+    analyze_level: &AnalyzeLevel
 ) -> AppResult<std::path::PathBuf> {
     use chrono::Local;
     
@@ -347,22 +414,27 @@ fn generate_output_path(
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
     
-    // Format: dir_batch1_medium_actionable-only_timestamp
+    // Format: dir_batch1_medium_analyze-low_actionable-only_timestamp
+    let model_tier_str = format!("{:?}", model_tier).to_lowercase();
+    let analyze_level_str = format!("analyze-{}", analyze_level);
+    
     let file_name = if actionable_only {
         format!(
-            "{}_batch{}_{}_{}_{}", 
+            "{}_batch{}_{}_{}_{}_{}", 
             dir_name, 
             batch_number, 
-            format!("{:?}", model_tier).to_lowercase(),
+            model_tier_str,
+            analyze_level_str,
             "actionable-only", 
             timestamp
         )
     } else {
         format!(
-            "{}_batch{}_{}_{}",
+            "{}_batch{}_{}_{}_{}", 
             dir_name, 
             batch_number, 
-            format!("{:?}", model_tier).to_lowercase(), 
+            model_tier_str,
+            analyze_level_str,
             timestamp
         )
     };
