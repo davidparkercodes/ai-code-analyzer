@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::str::FromStr;
 use serde::{Serialize, Deserialize};
-// Use serde_json with preserve_order feature
 use serde_json;
 
 /// Representation of an actionable recommendation
@@ -284,7 +283,6 @@ fn process_batch_results(
     result: &BatchAnalysisResult,
     config: &CleanCodeConfig
 ) -> AppResult<()> {
-    // Skip displaying results to console, only export to file and report summary
     let res = export_batch_analysis(
         &result.content, 
         &config.output_path, 
@@ -294,7 +292,6 @@ fn process_batch_results(
         &config.analyze_level
     );
     
-    // If successful, report the analysis is done
     if res.is_ok() {
         style::print_info(&format!("✅ Batch #{} analysis complete", result.batch_number));
     }
@@ -302,7 +299,6 @@ fn process_batch_results(
     res
 }
 
-// Removed unused function
 
 fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
     let batch_size = 10;
@@ -396,7 +392,6 @@ fn display_analysis_header(directory_path: &str) {
     style::print_info(&format!("📂 Analyzing directory: {}", directory_path));
 }
 
-// Removed unused function
 
 fn load_ai_configuration() -> AppResult<AiConfig> {
     match AiConfig::from_env() {
@@ -441,7 +436,6 @@ fn export_batch_analysis(
     actionable_only: bool,
     analyze_level: &AnalyzeLevel
 ) -> AppResult<()> {
-    // Validate that the content is valid JSON
     match serde_json::from_str::<serde_json::Value>(content) {
         Ok(json_value) => {
             let path = generate_output_path(
@@ -452,20 +446,17 @@ fn export_batch_analysis(
                 analyze_level
             )?;
             
-            // Get the file count from the JSON response if it's an array
             let file_count = if let serde_json::Value::Array(ref array) = json_value {
                 array.len()
             } else {
                 0
             };
             
-            // Reorder fields in each result to ensure file, score, actionable_items order
             let ordered_json = if let serde_json::Value::Array(array) = json_value {
                 let ordered_array = array.iter().map(|item| {
                     if let serde_json::Value::Object(map) = item {
                         let mut ordered_map = serde_json::Map::new();
                         
-                        // Build map with explicit ordering
                         ordered_map.insert("file".to_string(), map.get("file")
                             .cloned()
                             .unwrap_or(serde_json::Value::String("unknown".to_string())));
@@ -475,13 +466,11 @@ fn export_batch_analysis(
                             .unwrap_or(serde_json::Value::Number(serde_json::Number::from(0))));
                             
                         if let Some(items) = map.get("actionableItems") {
-                            // Also reorder each actionable item
                             if let serde_json::Value::Array(items_array) = items {
                                 let ordered_items = items_array.iter().map(|item| {
                                     if let serde_json::Value::Object(item_map) = item {
                                         let mut ordered_item = serde_json::Map::new();
                                         
-                                        // Build ordered item explicitly
                                         ordered_item.insert("location".to_string(), item_map.get("location")
                                             .cloned()
                                             .unwrap_or(serde_json::Value::String("unknown".to_string())));
@@ -500,10 +489,8 @@ fn export_batch_analysis(
                                     }
                                 }).collect();
                                 
-                                // Add actionableItems after file and score to ensure correct order
                                 ordered_map.insert("actionableItems".to_string(), serde_json::Value::Array(ordered_items));
                             } else {
-                                // Add actionableItems after file and score to ensure correct order
                                 ordered_map.insert("actionableItems".to_string(), items.clone());
                             }
                         }
@@ -519,7 +506,6 @@ fn export_batch_analysis(
                 json_value
             };
             
-            // Convert to our custom ordered structs to ensure proper field ordering
             let ordered_results: Vec<OrderedAnalysisResult> = if let serde_json::Value::Array(array) = &ordered_json {
                 array.iter().filter_map(|item| {
                     if let serde_json::Value::Object(map) = item {
@@ -559,13 +545,11 @@ fn export_batch_analysis(
                 Vec::new()
             };
             
-            // Format JSON output for better readability in the file with guaranteed field order
             let formatted_content = serde_json::to_string_pretty(&ordered_results)
                 .unwrap_or_else(|_| content.to_string());
             
             write_analysis_to_file(&path, &formatted_content)?;
             
-            // Log export success with file count
             log_export_success(batch_number, file_count, &path);
             
             Ok(())
@@ -595,7 +579,6 @@ fn generate_output_path(
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
     
-    // Format: dir_batch1_level-medium_analyze-low_actionable-only_timestamp
     let model_tier_str = format!("level-{}", format!("{:?}", model_tier).to_lowercase());
     let analyze_level_str = format!("analyze-{}", analyze_level);
     

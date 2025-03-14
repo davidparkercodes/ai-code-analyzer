@@ -1,4 +1,3 @@
-// Removed unused function
 
 /// Creates a complete AI prompt for clean code analysis with JSON output format
 pub fn create_clean_code_json_prompt(
@@ -21,7 +20,6 @@ fn concatenate_file_contents(file_contents: &[(String, String)]) -> String {
         .join("")
 }
 
-// Removed unused function
 
 /// Creates the appropriate type of JSON prompt based on the actionable_only flag
 fn create_json_prompt(actionable_only: bool, code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
@@ -62,7 +60,6 @@ fn get_scoring_instructions(analyze_level: &str) -> String {
     }
 }
 
-// Removed unused function
 
 /// Get strictness level instructions for actionable recommendations
 fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
@@ -85,7 +82,7 @@ fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
             4. Be specific and detailed in your analysis and recommendations\n\
             5. Consider both obvious violations and subtle optimization opportunities"
         },
-        _ => { // Medium level (default)
+        _ => {
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
             1. Focus ONLY on significant issues that would meaningfully improve the code\n\
             2. Provide a MAXIMUM of 3-5 recommendations total across all principles\n\
@@ -96,11 +93,8 @@ fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
     }.to_string()
 }
 
-// Removed unused function
 
-// Removed unused function
 
-// Removed unused function
 
 /// Get strictness level instructions for full analysis
 fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
@@ -121,7 +115,7 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
             4. Look for subtle optimization opportunities and design pattern improvements\n\
             5. Be specific and detailed in your analysis of both strengths and weaknesses"
         },
-        _ => { // Medium level (default)
+        _ => {
             "STANDARD STRICTNESS MODE INSTRUCTIONS:\n\
             1. Be balanced in your analysis, covering both strengths and weaknesses\n\
             2. Provide actionable recommendations only for significant issues (medium or high impact)\n\
@@ -132,11 +126,8 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
     }.to_string()
 }
 
-// Removed unused function
 
-// Removed unused function
 
-// Removed unused function
 
 /// Get JSON format instructions for output
 fn get_json_output_format() -> String {
