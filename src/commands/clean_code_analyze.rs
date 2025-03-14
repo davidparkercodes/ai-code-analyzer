@@ -194,7 +194,8 @@ fn process_batch_results(
         &result.content, 
         &config.output_path, 
         result.batch_number, 
-        &config.model_tier
+        &config.model_tier,
+        config.only_recommendations
     )
 }
 
@@ -317,9 +318,10 @@ fn export_batch_analysis(
     content: &str, 
     base_path: &str, 
     batch_number: usize, 
-    model_tier: &ModelTier
+    model_tier: &ModelTier,
+    actionable_only: bool
 ) -> AppResult<()> {
-    let path = generate_output_path(base_path, batch_number, model_tier)?;
+    let path = generate_output_path(base_path, batch_number, model_tier, actionable_only)?;
     
     write_analysis_to_file(&path, content)?;
     
@@ -331,7 +333,8 @@ fn export_batch_analysis(
 fn generate_output_path(
     base_path: &str, 
     batch_number: usize, 
-    model_tier: &ModelTier
+    model_tier: &ModelTier,
+    actionable_only: bool
 ) -> AppResult<std::path::PathBuf> {
     use chrono::Local;
     
@@ -343,13 +346,28 @@ fn generate_output_path(
     
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
-    let file_name = format!(
-        "{}_batch{}_{}_{}",
-        dir_name, 
-        batch_number, 
-        format!("{:?}", model_tier).to_lowercase(), 
-        timestamp
-    );
+    
+    // Format: dir-name_batch1_medium_actionable-only_timestamp
+    let file_name = if actionable_only {
+        format!(
+            "{}-{}_batch{}_{}_{}_{}",
+            output_name,
+            dir_name, 
+            batch_number, 
+            format!("{:?}", model_tier).to_lowercase(),
+            "actionable-only", 
+            timestamp
+        )
+    } else {
+        format!(
+            "{}-{}_batch{}_{}_{}", 
+            output_name,
+            dir_name, 
+            batch_number, 
+            format!("{:?}", model_tier).to_lowercase(), 
+            timestamp
+        )
+    };
     
     crate::output::path::resolve_output_path(output_name, &file_name, "md")
 }
