@@ -3,7 +3,7 @@ pub fn create_clean_code_prompt(
     file_contents: &[(String, String)],
     batch_number: usize,
     file_count: usize,
-    only_recommendations: bool,
+    only_recommendations: bool, // Parameter name kept for API compatibility
 ) -> String {
     let all_code = concatenate_file_contents(file_contents);
     

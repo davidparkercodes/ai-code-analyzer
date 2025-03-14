@@ -16,7 +16,7 @@ struct CleanCodeConfig {
     output_path: String,
     parallel_enabled: bool,
     model_tier: ModelTier,
-    only_recommendations: bool,
+    only_recommendations: bool, // Keeping field name for internal consistency
 }
 
 /// Analysis configuration for a single batch
@@ -46,9 +46,9 @@ pub async fn execute(
     output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String,
-    only_recommendations: bool
+    actionable_only: bool
 ) -> i32 {
-    match execute_clean_code_analysis(path, output_path, no_parallel, ai_level, only_recommendations).await {
+    match execute_clean_code_analysis(path, output_path, no_parallel, ai_level, actionable_only).await {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -59,14 +59,14 @@ async fn execute_clean_code_analysis(
     custom_output_path: Option<String>, 
     no_parallel: bool,
     ai_level: String,
-    only_recommendations: bool
+    actionable_only: bool
 ) -> AppResult<()> {
     let config = prepare_command_config(
         path, 
         custom_output_path.unwrap_or_default(), 
         no_parallel, 
         &ai_level, 
-        only_recommendations
+        actionable_only
     )?;
     
     let model = initialize_ai_model(&config.model_tier)?;
@@ -81,7 +81,7 @@ fn prepare_command_config(
     custom_output_path: String,
     no_parallel: bool,
     ai_level: &str,
-    only_recommendations: bool
+    actionable_only: bool
 ) -> AppResult<CleanCodeConfig> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let model_tier = parse_model_tier(ai_level)?;
@@ -95,7 +95,7 @@ fn prepare_command_config(
         output_path,
         parallel_enabled,
         model_tier,
-        only_recommendations,
+        only_recommendations: actionable_only,
     })
 }
 
