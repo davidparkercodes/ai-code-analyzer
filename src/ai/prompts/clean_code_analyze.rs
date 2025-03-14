@@ -105,9 +105,9 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
     let strictness_level = match analyze_level {
         "low" => {
             "MINIMAL STRICTNESS MODE INSTRUCTIONS:\n\
-            1. Focus primarily on highlighting the strengths of the code\n\
+            1. Conduct a fair, balanced review without bias toward strengths or weaknesses\n\
             2. Only mention the most significant clean code violations, if any\n\
-            3. It is entirely appropriate to praise well-structured code without finding issues\n\
+            3. It is entirely appropriate to note that well-structured code has no significant issues\n\
             4. Limit recommendations to only the most critical issues (1-2 at most)\n\
             5. For well-structured code, explicitly state that no significant issues were found\n"
         },

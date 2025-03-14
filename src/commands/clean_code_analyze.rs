@@ -414,8 +414,8 @@ fn generate_output_path(
     let timestamp = Local::now().timestamp();
     let output_name = "clean-code-analyze";
     
-    // Format: dir_batch1_medium_analyze-low_actionable-only_timestamp
-    let model_tier_str = format!("{:?}", model_tier).to_lowercase();
+    // Format: dir_batch1_level-medium_analyze-low_actionable-only_timestamp
+    let model_tier_str = format!("level-{}", format!("{:?}", model_tier).to_lowercase());
     let analyze_level_str = format!("analyze-{}", analyze_level);
     
     let file_name = if actionable_only {
