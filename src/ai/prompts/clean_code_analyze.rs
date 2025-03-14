@@ -141,6 +141,10 @@ fn get_json_output_format() -> String {
           \"location\": \"function_name()\",  // The function, method, or code section where the issue is found\n\
           \"recommendation\": \"Update function to follow single responsibility principle by splitting into two functions\"  // The actual recommendation\n\
         }\n\
+      ],\n\
+      \"strengthPoints\": [        // Array of strings highlighting well-implemented clean code principles (OMIT when using --actionable-only)\n\
+        \"Good use of meaningful variable names throughout the file\",\n\
+        \"Functions are small and focused on single responsibilities\"\n\
       ]\n\
     }\n\
     \n\
@@ -148,6 +152,7 @@ fn get_json_output_format() -> String {
     1. file\n\
     2. score\n\
     3. actionableItems\n\
+    4. strengthPoints (OMIT when using --actionable-only)\n\
     \n\
     CRITICAL REQUIREMENTS:\n\
     - Your response must ONLY contain a valid JSON array, with NO text before or after\n\
@@ -155,9 +160,11 @@ fn get_json_output_format() -> String {
     - For files with no issues, include an empty array for actionableItems\n\
     - Every recommendation MUST include location and recommendation fields\n\
     - Each recommendation should explain both WHAT to change and WHY it improves the code\n\
+    - When not in actionable-only mode, include 2-4 strength points that highlight well-implemented clean code principles\n\
+    - Each strength point should be specific, concise and directly related to clean code principles\n\
     - Follow the strictness level when determining what issues to include\n\
     - All recommendations should be concise but clear, focused on tangible improvements\n\
-    - Use camelCase for property names (actionableItems)".to_string()
+    - Use camelCase for property names (actionableItems, strengthPoints)".to_string()
 }
 
 /// Creates a prompt for actionable recommendations in JSON format

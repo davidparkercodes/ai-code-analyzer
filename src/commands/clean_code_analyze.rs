@@ -33,6 +33,8 @@ struct FileAnalysisResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     _ordering_field3: Option<()>,
     actionable_items: Vec<ActionableItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strength_points: Option<Vec<String>>,
 }
 
 /// Collection of file analysis results in JSON format
@@ -50,6 +52,8 @@ struct OrderedAnalysisResult {
     score: u32,
     #[serde(rename = "actionableItems")]
     actionable_items: Vec<OrderedActionableItem>,
+    #[serde(rename = "strengthPoints", skip_serializing_if = "Option::is_none")]
+    strength_points: Option<Vec<String>>,
 }
 
 /// Custom struct for ordered actionable items
@@ -543,6 +547,13 @@ fn export_batch_analysis(
                             }
                         }
                         
+                        // Add strength points if they exist and we're not in actionable-only mode
+                        if !actionable_only {
+                            if let Some(strengths) = map.get("strengthPoints") {
+                                ordered_map.insert("strengthPoints".to_string(), strengths.clone());
+                            }
+                        }
+                        
                         serde_json::Value::Object(ordered_map)
                     } else {
                         item.clone()
@@ -578,10 +589,28 @@ fn export_batch_analysis(
                             Vec::new()
                         };
                         
+                        let strength_points = if !actionable_only {
+                            if let Some(serde_json::Value::Array(strengths)) = map.get("strengthPoints") {
+                                let points: Vec<String> = strengths.iter()
+                                    .filter_map(|s| s.as_str().map(|str| str.to_string()))
+                                    .collect();
+                                if !points.is_empty() {
+                                    Some(points)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        
                         Some(OrderedAnalysisResult {
                             file,
                             score,
                             actionable_items,
+                            strength_points,
                         })
                     } else {
                         None
