@@ -1,7 +1,7 @@
 mod ai_config_test;
 mod analyzer_test;
 mod cache_test;
-mod clean_comments_test;
+mod delete_comments_test;
 mod dependency_graph_test;
 mod description_test;
 mod file_analyzer_test;

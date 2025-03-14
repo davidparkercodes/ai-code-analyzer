@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
-use code_analyzer::commands::clean_comments;
+use code_analyzer::commands::delete_comments;
 
 #[test]
-fn test_clean_comments_from_rust_files() {
+fn test_delete_comments_from_rust_files() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path();
     
@@ -13,8 +13,10 @@ fn test_clean_comments_from_rust_files() {
     let output_dir = TempDir::new().unwrap();
     let output_path = output_dir.path().to_str().unwrap().to_string();
     
-    let exit_code = clean_comments::execute(
+    let exit_code = delete_comments::execute(
         temp_path.to_str().unwrap().to_string(),
+        "rust",
+        false,
         Some(output_path.clone()),
         true,
         true,
@@ -84,8 +86,10 @@ fn test_dry_run_mode() {
     let test_file_path = temp_path.join(&fn1);
     let original_content = fs::read_to_string(&test_file_path).unwrap();
     
-    let exit_code = clean_comments::execute(
+    let exit_code = delete_comments::execute(
         test_file_path.to_str().unwrap().to_string(),
+        "rust",
+        true,
         None,
         true,
         true,

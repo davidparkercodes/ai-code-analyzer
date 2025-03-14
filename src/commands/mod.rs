@@ -3,7 +3,7 @@ mod metrics;
 mod dependencies;
 mod style;
 mod describe;
-pub mod clean_comments;
+pub mod delete_comments;
 
 use clap::{Parser, Subcommand};
 
@@ -99,9 +99,9 @@ pub enum Commands {
         #[arg(long)]
         no_parallel: bool,
     },
-    /// Clean comments from source code files
-    #[command(name = "clean-comments")]
-    CleanComments {
+    /// Delete comments from source code files
+    #[command(name = "delete-comments")]
+    DeleteComments {
         /// Path to analyze (defaults to current directory)
         #[arg(default_value = ".")]
         path: String,
@@ -147,7 +147,7 @@ pub async fn execute(cli: Cli) -> i32 {
             style::execute(path, no_output, output_path, no_parallel),
         Commands::Describe { path, no_output, output_path, no_parallel } => 
             describe::execute(path, no_output, output_path, no_parallel).await,
-        Commands::CleanComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
-            clean_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
+        Commands::DeleteComments { path, language, no_output, output_path, no_parallel, no_git, force, dry_run } => 
+            delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
     }
 }
