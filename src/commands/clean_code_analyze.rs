@@ -123,30 +123,63 @@ async fn analyze_code_in_batches(
     model: Arc<dyn crate::ai::AiModel>
 ) -> AppResult<()> {
     let start_time = Instant::now();
+    
+    // Create batches
     let batches = create_file_batches(source_files);
+    log_batch_processing_start(&batches);
     
+    // Process each batch
+    process_all_batches(&batches, model, config).await?;
+    
+    // Log completion
+    log_processing_complete(start_time.elapsed());
+    Ok(())
+}
+
+fn log_batch_processing_start(batches: &[FileBatch]) {
+    let max_batch_size = batches.first().map_or(0, |b| b.files.len());
     style::print_info(&format!("🔄 Processing {} batches of up to {} files each", 
-        batches.len(), batches.first().map_or(0, |b| b.files.len())));
-    
+        batches.len(), max_batch_size));
+}
+
+fn log_processing_complete(elapsed: Duration) {
+    style::print_success(&format!("✅ All batches processed in {:.2?}", elapsed));
+}
+
+async fn process_all_batches(
+    batches: &[FileBatch<'_>],
+    model: Arc<dyn crate::ai::AiModel>,
+    config: &CleanCodeConfig
+) -> AppResult<()> {
     for batch in batches {
+        // Analyze the batch
         let batch_result = analyze_code_batch(
-            &batch, 
+            batch, 
             model.clone(), 
             config.only_recommendations
         ).await?;
         
-        display_batch_results(&batch_result);
-        
-        export_batch_analysis(
-            &batch_result.content, 
-            &config.output_path, 
-            batch_result.batch_number, 
-            &config.model_tier
-        )?;
+        // Display and export results
+        process_batch_results(&batch_result, config)?;
     }
     
-    style::print_success(&format!("✅ All batches processed in {:.2?}", start_time.elapsed()));
     Ok(())
+}
+
+fn process_batch_results(
+    result: &BatchAnalysisResult,
+    config: &CleanCodeConfig
+) -> AppResult<()> {
+    // Display results
+    display_batch_results(result);
+    
+    // Export to file
+    export_batch_analysis(
+        &result.content, 
+        &config.output_path, 
+        result.batch_number, 
+        &config.model_tier
+    )
 }
 
 fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
