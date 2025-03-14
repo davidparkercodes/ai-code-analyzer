@@ -1,5 +1,7 @@
-/// Creates a complete AI prompt for clean code analysis based on file contents and settings
-pub fn create_clean_code_prompt(
+// Removed unused function
+
+/// Creates a complete AI prompt for clean code analysis with JSON output format
+pub fn create_clean_code_json_prompt(
     file_contents: &[(String, String)],
     batch_number: usize,
     file_count: usize,
@@ -8,7 +10,7 @@ pub fn create_clean_code_prompt(
 ) -> String {
     let all_code = concatenate_file_contents(file_contents);
     
-    create_prompt(actionable_only, all_code, batch_number, file_count, analyze_level)
+    create_json_prompt(actionable_only, all_code, batch_number, file_count, analyze_level)
 }
 
 /// Concatenates file paths and contents into a single string for the prompt
@@ -19,12 +21,14 @@ fn concatenate_file_contents(file_contents: &[(String, String)]) -> String {
         .join("")
 }
 
-/// Creates the appropriate type of prompt based on the actionable_only flag
-fn create_prompt(actionable_only: bool, code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+// Removed unused function
+
+/// Creates the appropriate type of JSON prompt based on the actionable_only flag
+fn create_json_prompt(actionable_only: bool, code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
     if actionable_only {
-        create_actionable_recommendations_prompt(code, batch_number, file_count, analyze_level)
+        create_actionable_json_prompt(code, batch_number, file_count, analyze_level)
     } else {
-        create_full_analysis_prompt(code, batch_number, file_count, analyze_level)
+        create_full_json_prompt(code, batch_number, file_count, analyze_level)
     }
 }
 
@@ -58,14 +62,7 @@ fn get_scoring_instructions(analyze_level: &str) -> String {
     }
 }
 
-/// Required score format instructions that must appear in all prompts
-fn get_required_output_format() -> String {
-    "REQUIRED OUTPUT FORMAT:\n\
-    - The FIRST line of your response MUST be exactly: \"Overall Clean Code Analyzation Score: [x]/100\" where [x] is a number from 0-100\n\
-    - If no score can be determined, use \"Overall Clean Code Analyzation Score: N/A/100\"\n\
-    - The score should reflect how well the code follows clean code principles, with 100 being perfect\n\
-    - Nothing else should appear on this first line".to_string()
-}
+// Removed unused function
 
 /// Get strictness level instructions for actionable recommendations
 fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
@@ -99,48 +96,11 @@ fn get_actionable_strictness_instructions(analyze_level: &str) -> String {
     }.to_string()
 }
 
-/// Common recommendations format instructions
-fn get_common_recommendation_instructions() -> String {
-    "1. Prioritize recommendations by impact (high, medium, low)\n\
-     2. Include line numbers or function names in your recommendations\n\
-     3. For each recommendation, explain the specific benefit the change would bring\n\
-     4. Consider the existing patterns in the codebase before suggesting changes".to_string()
-}
+// Removed unused function
 
-/// Output format for actionable recommendations
-fn get_actionable_output_format() -> String {
-    "- After the score line, continue with your recommendations or \"No significant issues found\"".to_string()
-}
+// Removed unused function
 
-/// Creates a prompt focused on high-value, actionable recommendations only
-pub fn create_actionable_recommendations_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
-    let base_prompt = create_shared_prompt_base();
-    let strictness_instructions = get_actionable_strictness_instructions(analyze_level);
-    let scoring_instructions = get_scoring_instructions(analyze_level);
-    let common_instructions = get_common_recommendation_instructions();
-    let required_format = get_required_output_format();
-    let output_format = get_actionable_output_format();
-    
-    format!(
-        "{}\n\n\
-        ACTIONABLE RECOMMENDATIONS INSTRUCTIONS:\n\
-        {}\n\
-        {}.\n\n\
-        {}\n\
-        {}\n\
-        {}\n\n\
-        Analyze these {} files (Batch #{}):\n{}",
-        base_prompt,
-        strictness_instructions,
-        scoring_instructions,
-        common_instructions,
-        required_format,
-        output_format,
-        file_count,
-        batch_number,
-        code
-    )
-}
+// Removed unused function
 
 /// Get strictness level instructions for full analysis
 fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
@@ -172,26 +132,76 @@ fn get_analysis_strictness_instructions(analyze_level: &str) -> String {
     }.to_string()
 }
 
-/// Common analysis instructions
-fn get_common_analysis_instructions() -> String {
-    "1. For each principle, indicate whether the code follows it with specific examples\n\
-     2. Include line numbers or function names in your recommendations whenever possible\n\
-     3. Consider the nature of the codebase and its patterns before suggesting changes".to_string()
+// Removed unused function
+
+// Removed unused function
+
+// Removed unused function
+
+/// Get JSON format instructions for output
+fn get_json_output_format() -> String {
+    "REQUIRED JSON OUTPUT FORMAT:\n\
+    You MUST provide your analysis results as a valid JSON array of objects, where each object has the following structure in this EXACT order:\n\
+    {\n\
+      \"file\": \"filename.rs\",     // The filename from the code blocks\n\
+      \"score\": 85,               // A number from 0-100 representing the clean code score\n\
+      \"actionableItems\": [       // Array of objects containing structured recommendations\n\
+        {\n\
+          \"location\": \"function_name()\",  // The function, method, or code section where the issue is found\n\
+          \"lineNumber\": 42,                // The approximate line number where the issue occurs\n\
+          \"recommendation\": \"Update function to follow single responsibility principle by splitting into two functions\"  // The actual recommendation\n\
+        }\n\
+      ]\n\
+    }\n\
+    \n\
+    IMPORTANT: The properties MUST appear IN THIS ORDER in the JSON output:\n\
+    1. file\n\
+    2. score\n\
+    3. actionableItems\n\
+    \n\
+    CRITICAL REQUIREMENTS:\n\
+    - Your response must ONLY contain a valid JSON array, with NO text before or after\n\
+    - Do not include any explanations, introductions, or markdown formatting\n\
+    - For files with no issues, include an empty array for actionableItems\n\
+    - Every recommendation MUST include location, lineNumber, and recommendation fields\n\
+    - If you can't determine the exact line number, provide your best estimate\n\
+    - Each recommendation should explain both WHAT to change and WHY it improves the code\n\
+    - Follow the strictness level when determining what issues to include\n\
+    - All recommendations should be concise but clear, focused on tangible improvements\n\
+    - Use camelCase for property names (actionableItems, lineNumber)".to_string()
 }
 
-/// Output format for full analysis
-fn get_analysis_output_format() -> String {
-    "- After the score line, provide your detailed analysis based on the principles above".to_string()
+/// Creates a prompt for actionable recommendations in JSON format
+pub fn create_actionable_json_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+    let base_prompt = create_shared_prompt_base();
+    let strictness_instructions = get_actionable_strictness_instructions(analyze_level);
+    let scoring_instructions = get_scoring_instructions(analyze_level);
+    let json_format = get_json_output_format();
+    
+    format!(
+        "{}\n\n\
+        ACTIONABLE RECOMMENDATIONS INSTRUCTIONS:\n\
+        {}\n\
+        {}.\n\n\
+        {}\n\n\
+        Remember: Your output must be ONLY valid JSON with no additional text.\n\n\
+        Analyze these {} files (Batch #{}):\n{}",
+        base_prompt,
+        strictness_instructions,
+        scoring_instructions,
+        json_format,
+        file_count,
+        batch_number,
+        code
+    )
 }
 
-/// Creates a prompt for comprehensive analysis of clean code principles
-pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
+/// Creates a prompt for full analysis in JSON format
+pub fn create_full_json_prompt(code: String, batch_number: usize, file_count: usize, analyze_level: &str) -> String {
     let base_prompt = create_shared_prompt_base();
     let strictness_instructions = get_analysis_strictness_instructions(analyze_level);
     let scoring_instructions = get_scoring_instructions(analyze_level);
-    let common_instructions = get_common_analysis_instructions();
-    let required_format = get_required_output_format();
-    let output_format = get_analysis_output_format();
+    let json_format = get_json_output_format();
     
     format!(
         "{}\n\n\
@@ -199,15 +209,12 @@ pub fn create_full_analysis_prompt(code: String, batch_number: usize, file_count
         {}\n\
         {}.\n\n\
         {}\n\n\
-        {}\n\
-        {}\n\n\
+        Remember: Your output must be ONLY valid JSON with no additional text.\n\n\
         Analyze these {} files (Batch #{}):\n{}",
         base_prompt,
         strictness_instructions,
         scoring_instructions,
-        common_instructions,
-        required_format,
-        output_format,
+        json_format,
         file_count,
         batch_number,
         code

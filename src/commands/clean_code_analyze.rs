@@ -1,5 +1,4 @@
 use crate::output::style;
-use crate::output::markdown::render_markdown;
 use crate::ai::{AiConfig, ModelTier, factory};
 use crate::ai::prompts::clean_code_analyze as prompt;
 use crate::util::error::{AppError, AppResult, handle_command_error};
@@ -10,6 +9,34 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::str::FromStr;
+use serde::{Serialize, Deserialize};
+use serde_json;
+
+/// Representation of an actionable recommendation
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ActionableItem {
+    location: String,
+    line_number: u32,
+    recommendation: String,
+}
+
+/// JSON representation of a clean code analysis file result
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileAnalysisResult {
+    file: String,
+    score: u32,
+    actionable_items: Vec<ActionableItem>,
+}
+
+/// Collection of file analysis results in JSON format
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BatchAnalysisJson {
+    batch_number: usize,
+    results: Vec<FileAnalysisResult>,
+}
 
 /// Strictness level for code analysis
 #[derive(Debug, Clone)]
@@ -67,8 +94,6 @@ struct BatchAnalysisConfig<'a> {
 struct BatchAnalysisResult {
     content: String,
     batch_number: usize,
-    file_count: usize,
-    elapsed: Duration,
 }
 
 /// File batch information
@@ -132,6 +157,7 @@ fn prepare_command_config(
     display_analysis_header(&path);
     log_parallel_status(parallel_enabled);
     log_analyze_level(&analyze_level);
+    style::print_info("📊 Output format: JSON");
     
     Ok(CleanCodeConfig {
         path,
@@ -233,17 +259,25 @@ fn process_batch_results(
     result: &BatchAnalysisResult,
     config: &CleanCodeConfig
 ) -> AppResult<()> {
-    display_batch_results(result);
-    
-    export_batch_analysis(
+    // Skip displaying results to console, only export to file and report summary
+    let res = export_batch_analysis(
         &result.content, 
         &config.output_path, 
         result.batch_number, 
         &config.model_tier,
         config.actionable_only,
         &config.analyze_level
-    )
+    );
+    
+    // If successful, report the analysis is done
+    if res.is_ok() {
+        style::print_info(&format!("✅ Batch #{} analysis complete", result.batch_number));
+    }
+    
+    res
 }
+
+// Removed unused function
 
 fn create_file_batches(source_files: &[PathBuf]) -> Vec<FileBatch> {
     let batch_size = 10;
@@ -288,11 +322,12 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
     let analysis = config.model.generate_response(&prompt).await
         .map_err(|e| AppError::Ai(e))?;
     
+    let elapsed = start_time.elapsed();
+    style::print_info(&format!("⌛ AI analysis completed in {:.2?}", elapsed));
+    
     Ok(BatchAnalysisResult {
         content: analysis,
         batch_number: batch.batch_number,
-        file_count: batch.files.len(),
-        elapsed: start_time.elapsed(),
     })
 }
 
@@ -322,7 +357,7 @@ fn create_ai_prompt(
     actionable_only: bool,
     analyze_level: &AnalyzeLevel
 ) -> String {
-    prompt::create_clean_code_prompt(
+    prompt::create_clean_code_json_prompt(
         file_contents,
         batch_number,
         file_count,
@@ -336,13 +371,7 @@ fn display_analysis_header(directory_path: &str) {
     style::print_info(&format!("📂 Analyzing directory: {}", directory_path));
 }
 
-fn display_batch_results(result: &BatchAnalysisResult) {
-    println!("\n{}\n", render_markdown(&result.content));
-    style::print_success(&format!(
-        "✨ Clean code analysis for batch #{} ({} files) completed in {:.2?}", 
-        result.batch_number, result.file_count, result.elapsed
-    ));
-}
+// Removed unused function
 
 fn load_ai_configuration() -> AppResult<AiConfig> {
     match AiConfig::from_env() {
@@ -387,13 +416,98 @@ fn export_batch_analysis(
     actionable_only: bool,
     analyze_level: &AnalyzeLevel
 ) -> AppResult<()> {
-    let path = generate_output_path(base_path, batch_number, model_tier, actionable_only, analyze_level)?;
-    
-    write_analysis_to_file(&path, content)?;
-    
-    log_export_success(batch_number, &path);
-    
-    Ok(())
+    // Validate that the content is valid JSON
+    match serde_json::from_str::<serde_json::Value>(content) {
+        Ok(json_value) => {
+            let path = generate_output_path(
+                base_path, 
+                batch_number, 
+                model_tier, 
+                actionable_only, 
+                analyze_level
+            )?;
+            
+            // Get the file count from the JSON response if it's an array
+            let file_count = if let serde_json::Value::Array(ref array) = json_value {
+                array.len()
+            } else {
+                0
+            };
+            
+            // Reorder fields in each result to ensure file, score, actionable_items order
+            let ordered_json = if let serde_json::Value::Array(array) = json_value {
+                let ordered_array = array.iter().map(|item| {
+                    if let serde_json::Value::Object(map) = item {
+                        let mut ordered_map = serde_json::Map::new();
+                        
+                        // Add fields in the desired order
+                        if let Some(file) = map.get("file") {
+                            ordered_map.insert("file".to_string(), file.clone());
+                        }
+                        
+                        if let Some(score) = map.get("score") {
+                            ordered_map.insert("score".to_string(), score.clone());
+                        }
+                        
+                        if let Some(items) = map.get("actionableItems") {
+                            // Also reorder each actionable item
+                            if let serde_json::Value::Array(items_array) = items {
+                                let ordered_items = items_array.iter().map(|item| {
+                                    if let serde_json::Value::Object(item_map) = item {
+                                        let mut ordered_item = serde_json::Map::new();
+                                        
+                                        // Add fields in the desired order
+                                        if let Some(location) = item_map.get("location") {
+                                            ordered_item.insert("location".to_string(), location.clone());
+                                        }
+                                        
+                                        if let Some(line_number) = item_map.get("lineNumber") {
+                                            ordered_item.insert("lineNumber".to_string(), line_number.clone());
+                                        }
+                                        
+                                        if let Some(recommendation) = item_map.get("recommendation") {
+                                            ordered_item.insert("recommendation".to_string(), recommendation.clone());
+                                        }
+                                        
+                                        serde_json::Value::Object(ordered_item)
+                                    } else {
+                                        item.clone()
+                                    }
+                                }).collect();
+                                
+                                ordered_map.insert("actionableItems".to_string(), serde_json::Value::Array(ordered_items));
+                            } else {
+                                ordered_map.insert("actionableItems".to_string(), items.clone());
+                            }
+                        }
+                        
+                        serde_json::Value::Object(ordered_map)
+                    } else {
+                        item.clone()
+                    }
+                }).collect();
+                
+                serde_json::Value::Array(ordered_array)
+            } else {
+                json_value
+            };
+            
+            // Format JSON output for better readability in the file
+            let formatted_content = serde_json::to_string_pretty(&ordered_json)
+                .unwrap_or_else(|_| content.to_string());
+            
+            write_analysis_to_file(&path, &formatted_content)?;
+            
+            // Log export success with file count
+            log_export_success(batch_number, file_count, &path);
+            
+            Ok(())
+        },
+        Err(e) => {
+            style::print_warning(&format!("Invalid JSON response: {}", e));
+            Err(AppError::Analysis(format!("Failed to parse JSON response: {}", e)))
+        }
+    }
 }
 
 fn generate_output_path(
@@ -439,7 +553,7 @@ fn generate_output_path(
         )
     };
     
-    crate::output::path::resolve_output_path(output_name, &file_name, "md")
+    crate::output::path::resolve_output_path(output_name, &file_name, "json")
 }
 
 fn write_analysis_to_file(path: &std::path::Path, content: &str) -> AppResult<()> {
@@ -450,10 +564,11 @@ fn write_analysis_to_file(path: &std::path::Path, content: &str) -> AppResult<()
         })
 }
 
-fn log_export_success(batch_number: usize, path: &std::path::Path) {
+fn log_export_success(batch_number: usize, file_count: usize, path: &std::path::Path) {
     style::print_success(&format!(
-        "📄 Clean code analysis batch #{} exported to {}", 
+        "📄 Clean code JSON analysis for batch #{} ({} files) exported to {}", 
         batch_number, 
+        file_count,
         path.display()
     ));
 }
