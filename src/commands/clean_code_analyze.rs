@@ -111,17 +111,37 @@ fn initialize_ai_model(tier: &ModelTier) -> AppResult<Arc<dyn crate::ai::AiModel
 fn scan_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBuf>> {
     let start_time = Instant::now();
     
-    let source_files = get_all_source_files(path, parallel_enabled)
-        .map_err(|e| AppError::Analysis(format!("Error scanning directory: {}", e)))?;
+    // Get source files
+    let source_files = get_source_files(path, parallel_enabled)?;
     
-    if source_files.is_empty() {
-        return Err(AppError::Analysis(format!("No source files found in {}", path)));
-    }
+    // Validate source files
+    validate_source_files(&source_files, path)?;
 
-    style::print_info(&format!("📂 Found {} source files to analyze in {:.2?}", 
-        source_files.len(), start_time.elapsed()));
+    // Log results
+    log_scan_results(&source_files, start_time.elapsed());
     
     Ok(source_files)
+}
+
+fn get_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBuf>> {
+    get_all_source_files(path, parallel_enabled)
+        .map_err(|e| map_scan_error(e))
+}
+
+fn map_scan_error(error: std::io::Error) -> AppError {
+    AppError::Analysis(format!("Error scanning directory: {}", error))
+}
+
+fn validate_source_files(files: &[PathBuf], path: &str) -> AppResult<()> {
+    if files.is_empty() {
+        return Err(AppError::Analysis(format!("No source files found in {}", path)));
+    }
+    Ok(())
+}
+
+fn log_scan_results(files: &[PathBuf], elapsed: Duration) {
+    style::print_info(&format!("📂 Found {} source files to analyze in {:.2?}", 
+        files.len(), elapsed));
 }
 
 async fn analyze_code_in_batches(
@@ -246,15 +266,22 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
 }
 
 fn collect_file_contents(files: &[PathBuf]) -> AppResult<Vec<(String, String)>> {
-    files.iter().map(|file_path| {
-        let display_path = file_path.display().to_string();
-        let content = fs::read_to_string(file_path)
-            .map_err(|e| AppError::Analysis(
-                format!("Error reading file {}: {}", display_path, e)
-            ))?;
-        
-        Ok((display_path, content))
-    }).collect()
+    files.iter()
+         .map(|file_path| read_file_with_path(file_path))
+         .collect()
+}
+
+fn read_file_with_path(file_path: &PathBuf) -> AppResult<(String, String)> {
+    let display_path = file_path.display().to_string();
+    
+    match fs::read_to_string(file_path) {
+        Ok(content) => Ok((display_path, content)),
+        Err(e) => Err(map_io_error(e, &display_path))
+    }
+}
+
+fn map_io_error(error: std::io::Error, file_path: &str) -> AppError {
+    AppError::Analysis(format!("Error reading file {}: {}", file_path, error))
 }
 
 fn create_ai_prompt(
