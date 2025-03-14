@@ -181,6 +181,24 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     
     style::print_success("Successfully committed changes to git repository.");
     
+    style::print_info("Pushing changes to remote repository...");
+    
+    let push_output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("push")
+        .output()
+        .map_err(AppError::Io)?;
+    
+    if !push_output.status.success() {
+        return Err(to_app_error(
+            format!("Git push failed: {}", String::from_utf8_lossy(&push_output.stderr)),
+            AppErrorType::Internal
+        ));
+    }
+    
+    style::print_success("Successfully pushed changes to remote repository.");
+    
     Ok(())
 }
 
