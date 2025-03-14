@@ -553,8 +553,8 @@ fn create_ordered_actionable_item(item_map: &serde_json::Map<String, serde_json:
     })
 }
 
-/// Extract strength points from JSON if available
-fn extract_strength_points(
+/// Extract strong points from JSON if available
+fn extract_strong_points(
     map: &serde_json::Map<String, serde_json::Value>,
     actionable_only: bool,
 ) -> Option<Vec<String>> {
@@ -562,9 +562,9 @@ fn extract_strength_points(
         return None;
     }
     
-    let strengths = map.get("strengthPoints")?;
-    if let serde_json::Value::Array(strengths_array) = strengths {
-        let points: Vec<String> = strengths_array.iter()
+    let strongs = map.get("strongPoints")?;
+    if let serde_json::Value::Array(strongs_array) = strongs {
+        let points: Vec<String> = strongs_array.iter()
             .filter_map(|s| s.as_str().map(|str| str.to_string()))
             .collect();
         
@@ -605,14 +605,14 @@ fn convert_to_ordered_results(
                     Vec::new()
                 };
                 
-                // Extract strength points
-                let strength_points = extract_strength_points(map, actionable_only);
+                // Extract strong points
+                let strong_points = extract_strong_points(map, actionable_only);
                 
                 Some(OrderedAnalysisResult {
                     file,
                     score,
                     actionable_items,
-                    strength_points,
+                    strong_points,
                 })
             } else {
                 None
