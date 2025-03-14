@@ -3,11 +3,11 @@ pub fn create_clean_code_prompt(
     file_contents: &[(String, String)],
     batch_number: usize,
     file_count: usize,
-    only_recommendations: bool, // Parameter name kept for API compatibility
+    actionable_only: bool,
 ) -> String {
     let all_code = concatenate_file_contents(file_contents);
     
-    create_prompt(only_recommendations, all_code, batch_number, file_count)
+    create_prompt(actionable_only, all_code, batch_number, file_count)
 }
 
 /// Concatenates file paths and contents into a single string for the prompt
@@ -18,9 +18,9 @@ fn concatenate_file_contents(file_contents: &[(String, String)]) -> String {
         .join("")
 }
 
-/// Creates the appropriate type of prompt based on the only_recommendations flag
-fn create_prompt(only_recommendations: bool, code: String, batch_number: usize, file_count: usize) -> String {
-    if only_recommendations {
+/// Creates the appropriate type of prompt based on the actionable_only flag
+fn create_prompt(actionable_only: bool, code: String, batch_number: usize, file_count: usize) -> String {
+    if actionable_only {
         create_actionable_recommendations_prompt(code, batch_number, file_count)
     } else {
         create_full_analysis_prompt(code, batch_number, file_count)

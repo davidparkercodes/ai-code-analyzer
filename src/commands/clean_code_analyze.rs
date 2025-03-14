@@ -16,14 +16,14 @@ struct CleanCodeConfig {
     output_path: String,
     parallel_enabled: bool,
     model_tier: ModelTier,
-    only_recommendations: bool, // Keeping field name for internal consistency
+    actionable_only: bool,
 }
 
 /// Analysis configuration for a single batch
 struct BatchAnalysisConfig<'a> {
     batch: &'a FileBatch<'a>,
     model: Arc<dyn crate::ai::AiModel>,
-    only_recommendations: bool,
+    actionable_only: bool,
 }
 
 /// Result of a batch analysis
@@ -95,7 +95,7 @@ fn prepare_command_config(
         output_path,
         parallel_enabled,
         model_tier,
-        only_recommendations: actionable_only,
+        actionable_only,
     })
 }
 
@@ -173,7 +173,7 @@ async fn process_all_batches(
         let batch_config = BatchAnalysisConfig {
             batch,
             model: model.clone(),
-            only_recommendations: config.only_recommendations,
+            actionable_only: config.actionable_only,
         };
         
         let batch_result = analyze_code_batch(&batch_config).await?;
@@ -195,7 +195,7 @@ fn process_batch_results(
         &config.output_path, 
         result.batch_number, 
         &config.model_tier,
-        config.only_recommendations
+        config.actionable_only
     )
 }
 
@@ -232,7 +232,7 @@ async fn analyze_code_batch(config: &BatchAnalysisConfig<'_>) -> AppResult<Batch
         &file_contents, 
         batch.batch_number, 
         batch.files.len(), 
-        config.only_recommendations
+        config.actionable_only
     );
     
     style::print_info(&format!("🧠 Analyzing code with AI (batch #{}: {} files)", 
@@ -272,13 +272,13 @@ fn create_ai_prompt(
     file_contents: &[(String, String)], 
     batch_number: usize, 
     file_count: usize,
-    only_recommendations: bool
+    actionable_only: bool
 ) -> String {
     prompt::create_clean_code_prompt(
         file_contents,
         batch_number,
         file_count,
-        only_recommendations
+        actionable_only
     )
 }
 
