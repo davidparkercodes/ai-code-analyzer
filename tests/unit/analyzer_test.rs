@@ -5,12 +5,9 @@ use std::path::Path;
 use tempfile::tempdir;
 
 fn setup_test_directory(dir: &Path) {
-    // Create a simple directory structure with some files
     fs::create_dir_all(dir.join("src")).expect("Failed to create subdirectory");
 
-    // Create a Rust file
     let rust_content = r#"
-// test.rs file
 fn main() {
     println!("Hello, world!");
 }
@@ -22,7 +19,6 @@ fn main() {
 
 #[test]
 fn test_analyzer_new() {
-    // Just verify we can create a new analyzer without errors
     let _analyzer = Analyzer::new();
 }
 

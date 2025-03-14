@@ -9,7 +9,6 @@ pub mod output;
 pub mod style_analyzer;
 pub mod util;
 
-// Re-export the modules for testing
 pub use crate::ai::*;
 pub use crate::analyzer::*;
 pub use crate::cache::*;

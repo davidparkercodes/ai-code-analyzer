@@ -44,7 +44,6 @@ impl CodeMetrics {
             return Err(format!("Path '{}' is not a directory", path.display()));
         }
 
-        // Count directories and files while walking the directory
         for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             
@@ -114,7 +113,6 @@ impl CodeMetrics {
             println!("\nBreakdown by Language:");
             println!("---------------------");
             
-            // Sort languages by lines of code for better readability
             let mut languages: Vec<(&String, &LanguageMetrics)> = self.by_language.iter().collect();
             languages.sort_by(|a, b| b.1.lines_of_code.cmp(&a.1.lines_of_code));
             

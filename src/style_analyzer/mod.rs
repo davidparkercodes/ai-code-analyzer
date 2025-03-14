@@ -7,8 +7,6 @@ use std::path::Path;
 pub use detector::StyleDetector;
 pub use report::StyleReport;
 
-// StylePattern re-export commented out to eliminate warnings
-// To use in tests, import directly from the pattern module
 
 pub struct StyleAnalyzer {
     detector: StyleDetector,

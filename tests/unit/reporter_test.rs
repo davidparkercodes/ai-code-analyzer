@@ -3,7 +3,6 @@ use code_analyzer::metrics::reporter::MetricsReporter;
 
 #[test]
 fn test_reporter_new() {
-    // Just ensure we can create a new reporter instance
     let reporter = MetricsReporter::new();
     reporter.report(&CodeMetrics::new());
 }
@@ -17,7 +16,6 @@ fn test_reporter_report() {
     metrics.blank_lines = 100;
     metrics.comment_lines = 200;
 
-    // Add language-specific metrics
     let mut rust_metrics = LanguageMetrics::new("Rust".to_string());
     rust_metrics.files = 5;
     rust_metrics.lines_of_code = 300;
@@ -34,7 +32,5 @@ fn test_reporter_report() {
 
     let reporter = MetricsReporter::new();
 
-    // This just tests that report runs without error
-    // Since it only prints to stdout, we can't easily assert the output
     reporter.report(&metrics);
 }

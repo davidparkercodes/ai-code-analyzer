@@ -100,7 +100,6 @@ impl DependencyAnalyzer {
             })
             .build();
             
-        // Collect all entries first to enable parallel processing
         let entries: Vec<DirEntry> = walker
             .filter_map(|result| {
                 match result {
@@ -120,7 +119,6 @@ impl DependencyAnalyzer {
             let path = entry.path();
             let path_str = path.to_string_lossy().to_string();
             
-            // Try to get dependencies from cache first
             if let Some(cached_deps) = self.cache.get_dependencies(&path_str) {
                 let normalized_path = self.normalize_path(path);
                 let mut graph_guard = graph.lock().unwrap();
@@ -137,7 +135,6 @@ impl DependencyAnalyzer {
             let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
             let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
             
-            // Try to get language from cache first
             let language = if let Some(cached_lang) = self.cache.get_language(&path_str) {
                 cached_lang
             } else {
@@ -146,7 +143,6 @@ impl DependencyAnalyzer {
                 } else {
                     self.language_detector.detect_language(extension)
                 };
-                // Cache the detected language
                 self.cache.cache_language(&path_str, detected_lang.clone());
                 detected_lang
             };
@@ -155,7 +151,6 @@ impl DependencyAnalyzer {
                 if let Some(dependencies) = self.extract_dependencies(path, &language) {
                     let normalized_path = self.normalize_path(path);
                     
-                    // Cache the dependencies
                     self.cache.cache_dependencies(&path_str, dependencies.clone());
                     
                     let mut graph_guard = graph.lock().unwrap();
@@ -171,18 +166,15 @@ impl DependencyAnalyzer {
         };
         
         if self.parallel {
-            // Process files in parallel
             entries.par_iter().for_each(|entry| {
                 process_entry(entry);
             });
         } else {
-            // Process files sequentially
             entries.iter().for_each(|entry| {
                 process_entry(entry);
             });
         }
         
-        // Purge any stale entries from the cache periodically
         self.cache.purge_stale_entries();
         
         let final_graph = match graph.lock() {
@@ -196,11 +188,9 @@ impl DependencyAnalyzer {
     fn extract_dependencies(&self, file_path: &Path, language: &str) -> Option<Vec<String>> {
         let path_str = file_path.to_string_lossy().to_string();
         
-        // Try to get content from cache first
         let content = if let Some(cached_content) = self.cache.get_file_content(&path_str) {
             cached_content
         } else if let Ok(file_content) = fs::read_to_string(file_path) {
-            // Cache the file content
             self.cache.cache_file_content(&path_str, file_content.clone());
             file_content
         } else {
@@ -342,7 +332,6 @@ impl DependencyAnalyzer {
     }
     
     fn resolve_dependency(&self, source_path: &str, dependency: &str) -> String {
-        // Filter out std, crate and other special module references
         if dependency.starts_with("std") || dependency.contains("std::") || 
            dependency.starts_with("crate") || dependency.contains("crate::") {
             return dependency.to_string();

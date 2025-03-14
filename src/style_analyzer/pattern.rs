@@ -3,19 +3,15 @@ use std::collections::HashMap;
 /// Represents a coding style rule that can be detected and enforced
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StyleRule {
-    // Naming conventions
     NamingConvention(NamingConvention),
     
-    // Measurable metrics
     MaxLineLength(usize),
     AvgLineLength(usize),
     IndentationStyle(IndentationStyle),
     
-    // Function metrics
     FunctionSize(usize),
     
-    // Comment metrics
-    CommentDensity(usize), // Comments-to-code ratio as percentage
+    CommentDensity(usize),
 }
 
 /// Represents a detected style pattern with its frequency in the codebase
@@ -23,8 +19,8 @@ pub enum StyleRule {
 pub struct StylePattern {
     pub rule: StyleRule,
     pub occurrences: usize,
-    pub consistency: f64, // 0.0 to 1.0 representing consistency across codebase
-    pub examples: Vec<String>, // Examples of code following this pattern
+    pub consistency: f64,
+    pub examples: Vec<String>,
     pub language: String,
 }
 
@@ -102,6 +98,4 @@ impl StylePatternCollection {
         }
     }
     
-    // Method removed as it's currently unused
-    // If needed in the future, uncomment and implement
 }

@@ -16,9 +16,7 @@ fn create_test_file(dir: &Path, filename: &str, content: &str) -> std::path::Pat
 fn test_analyze_file_rust() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
     let rust_content = r#"
-// This is a comment
 fn main() {
-    // Another comment
     println!("Hello, world!");
     
     /* Block comment
@@ -42,7 +40,6 @@ fn main() {
 
     assert_eq!(metrics.language, "Rust");
     assert_eq!(metrics.files, 1);
-    // Use actual implementation values
     assert_eq!(metrics.lines_of_code, 4);
     assert_eq!(metrics.blank_lines, 2);
     assert_eq!(metrics.comment_lines, 5);
@@ -78,7 +75,6 @@ def main():
 
     assert_eq!(metrics.language, "Python");
     assert_eq!(metrics.files, 1);
-    // Use actual implementation values
     assert_eq!(metrics.lines_of_code, 7);
     assert_eq!(metrics.blank_lines, 2);
     assert_eq!(metrics.comment_lines, 2);

@@ -49,7 +49,6 @@ impl OpenAiProvider {
             .build()
             .unwrap_or_default();
             
-        // Validate that we have an API key
         let _api_key = config.get_api_key(AiVendor::OpenAi)?;
             
         Ok(Self {
@@ -115,7 +114,6 @@ impl AiModel for OpenAiProvider {
         
         let response_data: OpenAiResponse = response.json().await?;
         
-        // Extract the content from the first choice
         if let Some(choice) = response_data.choices.first() {
             Ok(choice.message.content.clone())
         } else {

@@ -9,27 +9,22 @@ fn test_style_analyzer_integration() {
     let temp_dir = TempDir::new().unwrap();
     let dir_path = temp_dir.path();
     
-    // Create test files with different styles
     create_test_file(dir_path, "test1.rs", "fn main() {\n    let x = 5;\n    println!(\"x = {}\", x);\n}\n");
     create_test_file(dir_path, "test2.rs", "fn another_function() {\n    let someValue = 10;\n    println!(\"Value: {}\", someValue);\n}\n");
     
-    // Run style analyzer
     let analyzer = StyleAnalyzer::new();
     let result = analyzer.analyze_codebase(dir_path);
     
     assert!(result.is_ok());
     let report = result.unwrap();
     
-    // Check that the report contains style information
     assert!(report.to_string().contains("Code Metrics Analysis Report"));
     
-    // Verify style guide generation
     assert!(report.get_style_guide().is_some());
 }
 
 #[test]
 fn test_style_pattern_creation() {
-    // Create and test indentation pattern
     let rule = StyleRule::IndentationStyle(IndentationStyle::Spaces(4));
     let mut pattern = StylePattern::new(rule, "rust");
     
@@ -41,7 +36,6 @@ fn test_style_pattern_creation() {
     assert_eq!(pattern.language, "rust");
     assert_eq!(pattern.examples.len(), 1);
     
-    // Create and test naming convention pattern
     let rule = StyleRule::NamingConvention(NamingConvention::CamelCase);
     let mut pattern = StylePattern::new(rule, "javascript");
     
@@ -55,7 +49,6 @@ fn test_style_pattern_creation() {
     assert_eq!(pattern.examples.len(), 2);
 }
 
-// Helper function to create test files
 fn create_test_file<P: AsRef<Path>>(dir: P, filename: &str, content: &str) {
     let file_path = dir.as_ref().join(filename);
     fs::write(file_path, content).unwrap();

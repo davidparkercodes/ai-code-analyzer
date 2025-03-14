@@ -82,9 +82,8 @@ pub type AppResult<T> = Result<T, AppError>;
 
 /// Helper function for handling errors in command modules
 pub fn handle_command_error(error: &AppError) -> i32 {
-    // Import at use site to avoid circular dependencies
     use crate::output::style;
     
     style::print_error(&error.to_string());
-    1 // Return error exit code
+    1
 }
