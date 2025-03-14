@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::str::FromStr;
 use serde::{Serialize, Deserialize};
+// Use serde_json with preserve_order feature
 use serde_json;
 
 /// Representation of an actionable recommendation
@@ -25,8 +26,14 @@ struct ActionableItem {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FileAnalysisResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    _ordering_field1: Option<()>,
     file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    _ordering_field2: Option<()>,
     score: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    _ordering_field3: Option<()>,
     actionable_items: Vec<ActionableItem>,
 }
 
@@ -36,6 +43,24 @@ struct FileAnalysisResult {
 struct BatchAnalysisJson {
     batch_number: usize,
     results: Vec<FileAnalysisResult>,
+}
+
+/// Custom struct used only for serializing JSON in the correct order
+#[derive(Debug, Serialize)]
+struct OrderedAnalysisResult {
+    file: String,
+    score: u32,
+    #[serde(rename = "actionableItems")]
+    actionable_items: Vec<OrderedActionableItem>,
+}
+
+/// Custom struct for ordered actionable items
+#[derive(Debug, Serialize)]
+struct OrderedActionableItem {
+    location: String,
+    #[serde(rename = "lineNumber")]
+    line_number: u32,
+    recommendation: String,
 }
 
 /// Strictness level for code analysis
@@ -440,15 +465,15 @@ fn export_batch_analysis(
                     if let serde_json::Value::Object(map) = item {
                         let mut ordered_map = serde_json::Map::new();
                         
-                        // Add fields in the desired order
-                        if let Some(file) = map.get("file") {
-                            ordered_map.insert("file".to_string(), file.clone());
-                        }
-                        
-                        if let Some(score) = map.get("score") {
-                            ordered_map.insert("score".to_string(), score.clone());
-                        }
-                        
+                        // Build map with explicit ordering
+                        ordered_map.insert("file".to_string(), map.get("file")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::String("unknown".to_string())));
+                            
+                        ordered_map.insert("score".to_string(), map.get("score")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Number(serde_json::Number::from(0))));
+                            
                         if let Some(items) = map.get("actionableItems") {
                             // Also reorder each actionable item
                             if let serde_json::Value::Array(items_array) = items {
@@ -456,18 +481,18 @@ fn export_batch_analysis(
                                     if let serde_json::Value::Object(item_map) = item {
                                         let mut ordered_item = serde_json::Map::new();
                                         
-                                        // Add fields in the desired order
-                                        if let Some(location) = item_map.get("location") {
-                                            ordered_item.insert("location".to_string(), location.clone());
-                                        }
-                                        
-                                        if let Some(line_number) = item_map.get("lineNumber") {
-                                            ordered_item.insert("lineNumber".to_string(), line_number.clone());
-                                        }
-                                        
-                                        if let Some(recommendation) = item_map.get("recommendation") {
-                                            ordered_item.insert("recommendation".to_string(), recommendation.clone());
-                                        }
+                                        // Build ordered item explicitly
+                                        ordered_item.insert("location".to_string(), item_map.get("location")
+                                            .cloned()
+                                            .unwrap_or(serde_json::Value::String("unknown".to_string())));
+                                            
+                                        ordered_item.insert("lineNumber".to_string(), item_map.get("lineNumber")
+                                            .cloned()
+                                            .unwrap_or(serde_json::Value::Number(serde_json::Number::from(0))));
+                                            
+                                        ordered_item.insert("recommendation".to_string(), item_map.get("recommendation")
+                                            .cloned()
+                                            .unwrap_or(serde_json::Value::String("".to_string())));
                                         
                                         serde_json::Value::Object(ordered_item)
                                     } else {
@@ -475,8 +500,10 @@ fn export_batch_analysis(
                                     }
                                 }).collect();
                                 
+                                // Add actionableItems after file and score to ensure correct order
                                 ordered_map.insert("actionableItems".to_string(), serde_json::Value::Array(ordered_items));
                             } else {
+                                // Add actionableItems after file and score to ensure correct order
                                 ordered_map.insert("actionableItems".to_string(), items.clone());
                             }
                         }
@@ -492,8 +519,48 @@ fn export_batch_analysis(
                 json_value
             };
             
-            // Format JSON output for better readability in the file
-            let formatted_content = serde_json::to_string_pretty(&ordered_json)
+            // Convert to our custom ordered structs to ensure proper field ordering
+            let ordered_results: Vec<OrderedAnalysisResult> = if let serde_json::Value::Array(array) = &ordered_json {
+                array.iter().filter_map(|item| {
+                    if let serde_json::Value::Object(map) = item {
+                        let file = map.get("file")?.as_str()?.to_string();
+                        let score = map.get("score")?.as_u64()? as u32;
+                        
+                        let actionable_items = if let Some(serde_json::Value::Array(items)) = map.get("actionableItems") {
+                            items.iter().filter_map(|item| {
+                                if let serde_json::Value::Object(item_map) = item {
+                                    let location = item_map.get("location")?.as_str()?.to_string();
+                                    let line_number = item_map.get("lineNumber")?.as_u64()? as u32;
+                                    let recommendation = item_map.get("recommendation")?.as_str()?.to_string();
+                                    
+                                    Some(OrderedActionableItem {
+                                        location,
+                                        line_number,
+                                        recommendation,
+                                    })
+                                } else {
+                                    None
+                                }
+                            }).collect()
+                        } else {
+                            Vec::new()
+                        };
+                        
+                        Some(OrderedAnalysisResult {
+                            file,
+                            score,
+                            actionable_items,
+                        })
+                    } else {
+                        None
+                    }
+                }).collect()
+            } else {
+                Vec::new()
+            };
+            
+            // Format JSON output for better readability in the file with guaranteed field order
+            let formatted_content = serde_json::to_string_pretty(&ordered_results)
                 .unwrap_or_else(|_| content.to_string());
             
             write_analysis_to_file(&path, &formatted_content)?;
