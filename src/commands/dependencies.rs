@@ -6,8 +6,8 @@ use crate::util::error::{AppError, AppResult, handle_command_error};
 use crate::util::parallel::{log_parallel_status, parse_parallel_flag, ParallelProcessing};
 use std::time::Instant;
 
-pub fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
-    match execute_dependencies_command(path, output, no_parallel) {
+pub fn execute(path: String, no_output: bool, output_path: Option<String>, no_parallel: bool) -> i32 {
+    match execute_dependencies_command(path, no_output, output_path, no_parallel) {
         Ok(_) => 0,
         Err(error) => handle_command_error(&error)
     }
@@ -15,7 +15,8 @@ pub fn execute(path: String, output: Option<String>, no_parallel: bool) -> i32 {
 
 fn execute_dependencies_command(
     path: String, 
-    output: Option<String>, 
+    no_output: bool, 
+    custom_output_path: Option<String>,
     no_parallel: bool
 ) -> AppResult<()> {
     let parallel_enabled = parse_parallel_flag(no_parallel);
@@ -30,8 +31,13 @@ fn execute_dependencies_command(
     
     display_analysis_results(&reporter, &graph, start_time);
     
-    if let Some(output_path) = output {
-        export_dependency_graph(&reporter, &graph, output_path)?;
+    if !no_output {
+        if let Some(output_path) = custom_output_path {
+            export_dependency_graph(&reporter, &graph, output_path)?;
+        } else {
+            let default_output = path.clone();
+            export_dependency_graph(&reporter, &graph, default_output)?;
+        }
     }
     
     Ok(())
