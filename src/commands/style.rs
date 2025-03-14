@@ -62,13 +62,18 @@ fn export_style_guide(report: &StyleReport, output_path: String) -> AppResult<()
 }
 
 fn write_style_guide_to_file(content: &str, file_path: &str) -> AppResult<()> {
-    let path = Path::new(file_path);
-    std::fs::write(path, content)
+    let path = if file_path.starts_with('/') {
+        Path::new(file_path).to_path_buf()
+    } else {
+        crate::output::path::create_output_path("style", file_path, "md")?
+    };
+    
+    std::fs::write(&path, content)
         .map_err(|error| AppError::FileSystem { 
-            path: path.to_path_buf(), 
+            path: path.clone(), 
             message: format!("Error writing style guide: {}", error) 
         })?;
     
-    style::print_success(&format!("Style guide exported to {}", file_path));
+    style::print_success(&format!("Style guide exported to {}", path.display()));
     Ok(())
 }
