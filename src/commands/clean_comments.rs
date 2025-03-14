@@ -229,16 +229,36 @@ fn clean_comments(directory_path: &str, language: &str, output_dir: Option<&str>
     let output_base = if !dry_run {
         match output_dir {
             Some(dir) => {
-                let out_path = Path::new(dir);
-                if !out_path.exists() {
-                    fs::create_dir_all(out_path).map_err(|e| {
-                        AppError::FileSystem { 
-                            path: out_path.to_path_buf(), 
-                            message: format!("Failed to create output directory: {}", e) 
-                        }
-                    })?;
+                if dir.starts_with('/') {
+                    // If absolute path, use it directly
+                    let out_path = Path::new(&dir);
+                    if !out_path.exists() {
+                        fs::create_dir_all(out_path).map_err(|e| {
+                            AppError::FileSystem { 
+                                path: out_path.to_path_buf(), 
+                                message: format!("Failed to create output directory: {}", e) 
+                            }
+                        })?;
+                    }
+                    Some(PathBuf::from(dir))
+                } else {
+                    // If relative path or just name, use structured path
+                    let base_path = crate::output::path::ensure_base_output_dir()?;
+                    let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
+                    let clean_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "clean_comments")?;
+                    let final_dir = clean_comments_path.join(dir);
+                    
+                    if !final_dir.exists() {
+                        fs::create_dir_all(&final_dir).map_err(|e| {
+                            AppError::FileSystem { 
+                                path: final_dir.clone(), 
+                                message: format!("Failed to create output directory: {}", e) 
+                            }
+                        })?;
+                    }
+                    
+                    Some(final_dir)
                 }
-                Some(PathBuf::from(dir))
             },
             None => None,
         }
