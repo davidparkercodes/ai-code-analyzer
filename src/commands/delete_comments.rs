@@ -9,6 +9,7 @@ use std::io::{self, Write};
 use std::process::Command;
 use walkdir::WalkDir;
 use regex::Regex;
+use chrono;
 
 pub fn execute(
     path: String, 
@@ -76,7 +77,9 @@ fn execute_delete_comments_command(
     }
     
     if is_git_repo && !dry_run && !no_git {
-        let branch_name = format!("feature/delete-{}-comments", language);
+        // Generate timestamp in UTC format (YYYYMMDD-HHMMSS)
+        let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        let branch_name = format!("ai-code-analyzer/delete-comments-{}-{}", language, timestamp);
         create_git_branch(&path_buf, &branch_name)?;
     }
     
