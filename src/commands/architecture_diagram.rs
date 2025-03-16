@@ -6,7 +6,9 @@ use crate::output::style;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
-use tracing::{info, error};
+use std::io::Write;
+use std::process::{Command, Stdio};
+use tracing::{info, error, warn};
 
 pub async fn execute(
     path: String, 
@@ -31,7 +33,7 @@ pub async fn execute(
     info!("Diagram detail level: {}", detail);
     
     // Define valid formats and detail levels
-    let valid_formats = vec!["dot", "plantuml", "mermaid", "c4"];
+    let valid_formats = vec!["dot", "plantuml", "mermaid", "c4", "svg"];
     let valid_detail_levels = vec!["high", "medium", "low"];
     
     // Validate format
@@ -128,51 +130,32 @@ pub async fn execute(
         }
     }
     
+    // Create a map of all dependencies for diagram generation
+    let mut all_dependencies = HashMap::new();
+    
+    for node in dependency_graph.get_nodes() {
+        let dependencies = dependency_graph.get_dependencies(node);
+        all_dependencies.insert(node.clone(), dependencies);
+    }
+    
     // Create the diagram based on format
     let diagram_content = match format.as_str() {
         "dot" => {
-            // Create a map of all dependencies for diagram generation
-            let mut all_dependencies = HashMap::new();
-            
-            for node in dependency_graph.get_nodes() {
-                let dependencies = dependency_graph.get_dependencies(node);
-                all_dependencies.insert(node.clone(), dependencies);
-            }
-            
             generate_dot_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         "plantuml" => {
-            // Create a map of all dependencies for diagram generation
-            let mut all_dependencies = HashMap::new();
-            
-            for node in dependency_graph.get_nodes() {
-                let dependencies = dependency_graph.get_dependencies(node);
-                all_dependencies.insert(node.clone(), dependencies);
-            }
-            
             generate_plantuml_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         "mermaid" => {
-            // Create a map of all dependencies for diagram generation
-            let mut all_dependencies = HashMap::new();
-            
-            for node in dependency_graph.get_nodes() {
-                let dependencies = dependency_graph.get_dependencies(node);
-                all_dependencies.insert(node.clone(), dependencies);
-            }
-            
             generate_mermaid_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         "c4" => {
-            // Create a map of all dependencies for diagram generation
-            let mut all_dependencies = HashMap::new();
-            
-            for node in dependency_graph.get_nodes() {
-                let dependencies = dependency_graph.get_dependencies(node);
-                all_dependencies.insert(node.clone(), dependencies);
-            }
-            
             generate_c4_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
+        },
+        "svg" => {
+            // SVG format is generated from DOT, so we first create a DOT diagram
+            // and then convert it to SVG using Graphviz
+            generate_svg_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         _ => {
             error!("Unsupported diagram format: {}", format);
@@ -253,6 +236,7 @@ fn get_file_extension(format: &str) -> &str {
         "plantuml" => "puml",
         "mermaid" => "mmd",
         "c4" => "puml",
+        "svg" => "svg",
         _ => "txt",
     }
 }
@@ -657,6 +641,84 @@ fn generate_c4_diagram(
     c4
 }
 
+fn generate_svg_diagram(
+    dependencies: &HashMap<String, Vec<String>>,
+    detail_level: &str,
+    group_by_module: bool,
+    focus: Option<&str>,
+) -> String {
+    // First generate a DOT diagram
+    let dot_content = generate_dot_diagram(dependencies, detail_level, group_by_module, focus);
+    
+    // Check if Graphviz is installed
+    match Command::new("dot").arg("-V").output() {
+        Ok(_) => {
+            // Graphviz is installed, use it to convert DOT to SVG
+            match convert_dot_to_svg(&dot_content) {
+                Ok(svg) => svg,
+                Err(err) => {
+                    warn!("Failed to convert DOT diagram to SVG: {}", err);
+                    format!(
+                        "<!-- Failed to generate SVG: {} -->\n<svg width=\"300\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n  <text x=\"10\" y=\"50\" font-family=\"sans-serif\">Error: {}</text>\n</svg>",
+                        err.replace('"', "&quot;"),
+                        err.replace('"', "&quot;")
+                    )
+                }
+            }
+        },
+        Err(_) => {
+            // Graphviz is not installed, provide an error message as SVG
+            warn!("Graphviz (dot) is not installed. Cannot generate SVG diagram.");
+            let error_svg = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n") +
+                "<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
+                "  <rect width=\"500\" height=\"200\" fill=\"#f8f8f8\" stroke=\"#ccc\" stroke-width=\"1\"/>\n" +
+                "  <text x=\"20\" y=\"40\" font-family=\"sans-serif\" font-size=\"16\" fill=\"#333\">Error: Graphviz (dot) is not installed</text>\n" +
+                "  <text x=\"20\" y=\"70\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">To generate SVG diagrams:</text>\n" +
+                "  <text x=\"20\" y=\"100\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">1. Install Graphviz from https://graphviz.org/download/</text>\n" +
+                "  <text x=\"20\" y=\"130\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">2. Make sure 'dot' command is available in your PATH</text>\n" +
+                "  <text x=\"20\" y=\"160\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">3. Run the command again</text>\n" +
+                "</svg>";
+            error_svg
+        }
+    }
+}
+
+fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
+    // Create a dot process
+    let mut process = match Command::new("dot")
+        .arg("-Tsvg")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn() {
+            Ok(p) => p,
+            Err(e) => return Err(format!("Failed to spawn Graphviz: {}", e)),
+        };
+    
+    // Write DOT content to its stdin
+    if let Some(mut stdin) = process.stdin.take() {
+        if let Err(e) = stdin.write_all(dot_content.as_bytes()) {
+            return Err(format!("Failed to write to Graphviz stdin: {}", e));
+        }
+        // stdin will be closed when dropped
+    }
+    
+    // Get output
+    match process.wait_with_output() {
+        Ok(output) => {
+            if output.status.success() {
+                match String::from_utf8(output.stdout) {
+                    Ok(svg) => Ok(svg),
+                    Err(e) => Err(format!("Invalid UTF-8 in SVG output: {}", e)),
+                }
+            } else {
+                let error = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Graphviz error: {}", error))
+            }
+        },
+        Err(e) => Err(format!("Failed to get Graphviz output: {}", e)),
+    }
+}
+
 // Group dependencies by module path
 fn group_dependencies_by_module(
     dependencies: &HashMap<String, Vec<String>>,
@@ -750,6 +812,14 @@ fn suggest_visualization(format: &str, output_file: &Path) {
             println!("1. Use the Mermaid Live Editor: https://mermaid.live/");
             println!("2. Or install Mermaid CLI: npm install -g @mermaid-js/mermaid-cli");
             println!("3. Run: mmdc -i {} -o architecture.png", output_file.display());
+        }
+        "svg" => {
+            println!("To view the SVG diagram:");
+            println!("1. Open the file in any web browser or SVG viewer");
+            println!("2. To import into LucidChart:");
+            println!("   - Open LucidChart and create a new diagram");
+            println!("   - Click on File → Import → SVG");
+            println!("   - Select the generated SVG file ({})", output_file.display());
         }
         _ => {}
     }

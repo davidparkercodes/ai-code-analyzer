@@ -86,7 +86,7 @@ aicodeanalyzer architecture-diagram /path/to/code [options]
 
 ### Options
 
-- `--format <format>`: Diagram format (dot, plantuml, mermaid, c4) [default: dot]
+- `--format <format>`: Diagram format (dot, plantuml, mermaid, c4, svg) [default: dot]
 - `--detail <level>`: Detail level (high, medium, low) [default: medium]
 - `--group-by-module`: Group files by their parent module/directory
 - `--include-tests`: Include test files in the architecture diagram
@@ -101,6 +101,21 @@ aicodeanalyzer architecture-diagram /path/to/code [options]
 - **PlantUML**: Text-based UML diagram format with multiple rendering options
 - **Mermaid**: JavaScript-based diagramming tool that works in Markdown
 - **C4**: Architecture diagram format focusing on containers and components
+- **SVG**: Vector graphic format that can be imported into LucidChart and other diagramming tools
+
+### LucidChart Integration
+
+The SVG format provides a direct path to import architecture diagrams into LucidChart:
+
+```bash
+# Generate an SVG diagram
+aicodeanalyzer architecture-diagram /path/to/code --format svg
+
+# The tool will provide instructions for importing into LucidChart:
+# 1. Open LucidChart and create a new diagram
+# 2. Click on File → Import → SVG
+# 3. Select the generated SVG file
+```
 
 After generating a diagram, the tool provides instructions for rendering it using the appropriate tools.
 
