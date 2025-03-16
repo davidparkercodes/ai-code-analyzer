@@ -55,7 +55,7 @@ fn test_collect_metrics() {
     let metrics = result.unwrap();
 
     assert_eq!(metrics.total_files, 3);
-    assert_eq!(metrics.total_directories, 4);
+    assert_eq!(metrics.total_directories, 3);
 
     assert_eq!(metrics.by_language.len(), 3);
 

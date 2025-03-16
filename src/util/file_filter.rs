@@ -24,8 +24,10 @@ impl FileFilter {
     pub fn is_test_file<P: AsRef<Path>>(path: P) -> bool {
         let path_str = path.as_ref().to_string_lossy();
         
-        path_str.contains("/test") || 
+        path_str.contains("/test/") || 
         path_str.contains("/tests/") || 
+        path_str.ends_with("/test") ||
+        path_str.ends_with("/tests") ||
         path_str.contains("_test.") || 
         path_str.ends_with("_test.rs") ||
         path_str.ends_with("_tests.rs") ||
@@ -64,7 +66,7 @@ impl FileFilter {
     
     /// Checks if a file should be excluded from analysis for any reason
     pub fn should_exclude<P: AsRef<Path>>(path: P) -> bool {
-        Self::is_system_file(&path) || Self::is_binary_or_media_file(&path)
+        Self::is_system_file(&path) || Self::is_binary_or_media_file(&path) || Self::is_test_file(&path)
     }
     
     /// Check if a file is a source code file that should be included in analysis
