@@ -17,7 +17,7 @@ pub fn execute(
     output_path: Option<String>, 
     no_parallel: bool,
     no_git: bool,
-    _force: bool,  // Renamed to _force as it's not used
+    _force: bool,
     dry_run: bool
 ) -> i32 {
     match execute_delete_comments_command(path, language, no_output, output_path, no_parallel, no_git, _force, dry_run) {
@@ -33,7 +33,7 @@ fn execute_delete_comments_command(
     output_path: Option<String>,
     no_parallel: bool,
     no_git: bool,
-    _force: bool,  // Renamed to _force as it's not used
+    _force: bool,
     dry_run: bool
 ) -> AppResult<()> {
     if !["rust", "python"].contains(&language.to_lowercase().as_str()) {
@@ -45,14 +45,12 @@ fn execute_delete_comments_command(
     let parallel_enabled = parse_parallel_flag(no_parallel);
     let path_buf = PathBuf::from(&path);
     
-    // Verify git repository
     let is_git_repo = if !no_git {
         check_git_repository(&path_buf)?
     } else {
         false
     };
     
-    // Require git repository for safety
     if !is_git_repo && !dry_run && (output_path.is_none() && !no_output) {
         style::print_error("This command requires a git repository to run safely.");
         style::print_error("Please run in a git repository, use --dry-run, or specify an output directory.");
@@ -62,7 +60,6 @@ fn execute_delete_comments_command(
         ));
     }
     
-    // Show explanation about git operations
     if is_git_repo && !dry_run && !no_git {
         style::print_header("\nGit Operations");
         style::print_info("This command will:");
@@ -72,13 +69,11 @@ fn execute_delete_comments_command(
         style::print_info("You can then create a PR to review the changes before merging.");
     }
     
-    // Ask for confirmation
     if !dry_run && !confirm_operation(is_git_repo)? {
         style::print_info("Operation cancelled by user.");
         return Ok(());
     }
     
-    // Create a git branch if in a git repo and not in dry-run mode
     if is_git_repo && !dry_run && !no_git {
         let branch_name = format!("feature/delete-{}-comments", language);
         create_git_branch(&path_buf, &branch_name)?;
@@ -156,7 +151,6 @@ fn confirm_operation(is_git_repo: bool) -> AppResult<bool> {
 fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
     style::print_info(&format!("Creating git branch: {}", branch_name));
     
-    // Check if branch already exists
     let branch_check = Command::new("git")
         .arg("-C")
         .arg(path)
@@ -169,7 +163,6 @@ fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
     if branch_check.status.success() {
         style::print_warning(&format!("Branch '{}' already exists. Using existing branch.", branch_name));
         
-        // Checkout existing branch
         let checkout_output = Command::new("git")
             .arg("-C")
             .arg(path)
@@ -185,7 +178,6 @@ fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
             ));
         }
     } else {
-        // Create and checkout new branch
         let branch_output = Command::new("git")
             .arg("-C")
             .arg(path)
@@ -398,7 +390,6 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
                         style::print_info(&format!("Would remove {} comments from {}", comment_count, path.display()));
                         print_comment_preview(&content, &cleaned_content, path.to_str().unwrap_or("file"));
                         
-                        // For tests, also create output in dry-run mode if output_dir is specified
                         if let Some(base) = &output_base {
                             let file_name = path.file_name().unwrap();
                             let target_path = base.join(file_name);
@@ -453,7 +444,6 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
                         style::print_info(&format!("Would remove {} comments from {}", comment_count, file_path.display()));
                         print_comment_preview(&content, &cleaned_content, file_path.to_str().unwrap_or("file"));
                         
-                        // For tests, also create output in dry-run mode if output_dir is specified
                         if let Some(base) = &output_base {
                             let rel_path = file_path.strip_prefix(path).unwrap_or(file_path);
                             let target = base.join(rel_path);
@@ -518,7 +508,6 @@ fn delete_file_content(
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
-    // Extract the pattern from the regex to determine if we're looking for // or #
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
     
@@ -555,13 +544,11 @@ fn delete_file_content(
             continue;
         }
         
-        // Handle Rust single-line comments
         if !is_python && trimmed.starts_with("//") && !trimmed.starts_with("///") {
             *comment_count += 1;
             continue;
         }
         
-        // Handle Python single-line comments
         if is_python && trimmed.starts_with("#") && !trimmed.starts_with("###") {
             *comment_count += 1;
             continue;
@@ -599,7 +586,6 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     
     let mut comment_pos = None;
     
-    // Extract the pattern from the regex to determine if we're looking for // or #
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
     
@@ -620,7 +606,6 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
                 in_string = !in_string;
             },
             
-            // Handle Rust comments
             '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
@@ -629,7 +614,6 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
                 }
             },
             
-            // Handle Python comments
             '#' if is_python && !in_string => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
@@ -667,7 +651,6 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
         let original_line = original_lines[orig_pos];
         
         let trimmed = original_line.trim_start();
-        // Handle both Rust and Python comments
         if ((trimmed.starts_with("//") && !trimmed.starts_with("///")) || 
            (trimmed.starts_with("#") && !trimmed.starts_with("###"))) && 
            !original_line.contains("aicodeanalyzer: ignore") {

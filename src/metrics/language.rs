@@ -50,7 +50,6 @@ impl LanguageDetector {
             "sh" | "bash" => "Shell",
             "lock" => "LockFile",
             "sample" => "Sample",
-            // .NET Languages
             "cs" => "C#",
             "vb" => "VisualBasic",
             "fs" => "FSharp",

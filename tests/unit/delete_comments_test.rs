@@ -18,27 +18,23 @@ fn test_delete_comments_from_rust_files() {
         "rust".to_string(),
         false,
         Some(output_path.clone()),
-        true,  // no_parallel
-        true,  // no_git
-        true,  // force
-        true   // dry_run - use dry run mode for tests so we don't need git
+        true,
+        true,
+        true,
+        true
     );
     
     assert_eq!(exit_code, 0);
     
-    // Read the original files and verify they were not changed
     let file1_path = temp_path.join("test1.rs");
     let file2_path = temp_path.join("test2.rs");
     let file3_path = temp_path.join("test3.rs");
     let file4_path = temp_path.join("test4.rs");
     
-    // Verify original files contain comments
     let original_file1 = fs::read_to_string(&file1_path).unwrap();
     assert!(original_file1.contains("// This is a comment"));
     assert!(original_file1.contains("// End of line comment"));
     
-    // Inspect output directory - this should be empty in dry-run mode with output
-    // since we're only showing what would be deleted, not actually writing files
     if let Ok(entries) = fs::read_dir(&output_path) {
         println!("Files in output directory:");
         for entry in entries.filter_map(|e| e.ok()) {
@@ -63,12 +59,12 @@ fn test_dry_run_mode() {
     let exit_code = delete_comments::execute(
         test_file_path.to_str().unwrap().to_string(),
         "rust".to_string(),
-        true,  // no_output
-        None,  // output_path
-        true,  // no_parallel
-        true,  // no_git
-        true,  // force
-        true   // dry_run
+        true,
+        None,
+        true,
+        true,
+        true,
+        true
     );
     
     assert_eq!(exit_code, 0);
@@ -92,26 +88,23 @@ fn test_delete_comments_from_python_files() {
     let exit_code = delete_comments::execute(
         temp_path.to_str().unwrap().to_string(),
         "python".to_string(),
-        false, // no_output
+        false,
         Some(output_path.clone()),
-        true,  // no_parallel
-        true,  // no_git
-        true,  // force
-        true   // dry_run - use dry run mode for tests so we don't need git
+        true,
+        true,
+        true,
+        true
     );
     
     assert_eq!(exit_code, 0);
     
-    // Read the original files and verify they were not changed
     let file1_path = temp_path.join("test1.py");
     let file2_path = temp_path.join("test2.py");
     
-    // Verify original files contain comments
     let original_file1 = fs::read_to_string(&file1_path).unwrap();
     assert!(original_file1.contains("# This is a comment"));
     assert!(original_file1.contains("# End of line comment"));
     
-    // Inspect output directory - this should be empty in dry-run mode with output
     if let Ok(entries) = fs::read_dir(&output_path) {
         println!("Python files in output directory:");
         for entry in entries.filter_map(|e| e.ok()) {
@@ -121,14 +114,13 @@ fn test_delete_comments_from_python_files() {
 }
 
 fn get_rs_extension() -> String {
-    // Creating extension avoiding literal .rs
     format!("{}{}", ".", "rs")
 }
 
 fn create_test_files(dir_path: &Path) {
     let file1_content = r###"// This is a comment
 fn main() {
-    let x = 5; // End of line comment
+    let x = 5;
     println!("Hello");
 }
 "###;
