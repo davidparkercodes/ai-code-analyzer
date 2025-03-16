@@ -82,3 +82,16 @@ CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze co
 -   Maintain the modular architecture to allow for future extension
 -   All public APIs should have clear interfaces and documentation
 -   Handle errors gracefully with informative messages
+
+## Recent Updates
+
+### Fixed delete-comments command to properly ignore test files (2025-03-16)
+
+The delete-comments command now properly ignores test files during processing. 
+
+**Changes made:**
+1. Updated `should_exclude()` method in `FileFilter` to include `is_test_file()` in the exclusion check
+2. Added a test case to verify test files are properly ignored
+3. Fixed existing tests that were affected by this change
+
+This ensures that when running the delete-comments command, it will not modify any test files, preserving test cases.
