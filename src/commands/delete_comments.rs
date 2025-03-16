@@ -66,7 +66,8 @@ fn execute_delete_comments_command(
         style::print_info("1. Create a new branch for the changes");
         style::print_info("2. Delete comments from your code files");
         style::print_info("3. Commit the changes to the new branch");
-        style::print_info("You can then create a PR to review the changes before merging.");
+        style::print_info("4. Push the branch to your remote repository");
+        style::print_info("5. Create a PR for review (if GitHub CLI is available)");
     }
     
     if !dry_run && !confirm_operation(is_git_repo)? {
@@ -261,10 +262,32 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     
     style::print_info("Pushing changes to remote repository...");
     
+    // Get current branch name
+    let branch_output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("rev-parse")
+        .arg("--abbrev-ref")
+        .arg("HEAD")
+        .output()
+        .map_err(AppError::Io)?;
+    
+    if !branch_output.status.success() {
+        return Err(to_app_error(
+            format!("Failed to get branch name: {}", String::from_utf8_lossy(&branch_output.stderr)),
+            AppErrorType::Internal
+        ));
+    }
+    
+    let branch_name = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
+    
     let push_output = Command::new("git")
         .arg("-C")
         .arg(path)
         .arg("push")
+        .arg("--set-upstream")
+        .arg("origin")
+        .arg(&branch_name)
         .output()
         .map_err(AppError::Io)?;
     
@@ -276,6 +299,43 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     }
     
     style::print_success("Successfully pushed changes to remote repository.");
+    
+    // Create a PR using the GitHub CLI
+    style::print_info("Creating pull request...");
+    
+    // Check if gh CLI is installed
+    let gh_check = Command::new("which")
+        .arg("gh")
+        .output();
+    
+    if gh_check.is_err() || !gh_check.unwrap().status.success() {
+        style::print_warning("GitHub CLI not found. Skipping PR creation.");
+        style::print_info("To create a PR manually, visit your repository on GitHub.");
+        return Ok(());
+    }
+    
+    let pr_title = format!("Delete comments from codebase");
+    let pr_body = format!("## Summary\n- Removed unnecessary comments from codebase\n- Improved code readability\n\n## Changes\n- Deleted single-line comments\n- Preserved documentation comments\n- Maintained code functionality");
+    
+    let pr_output = Command::new("gh")
+        .arg("pr")
+        .arg("create")
+        .arg("--title")
+        .arg(pr_title)
+        .arg("--body")
+        .arg(pr_body)
+        .current_dir(path)
+        .output()
+        .map_err(AppError::Io)?;
+    
+    if !pr_output.status.success() {
+        style::print_warning(&format!("PR creation failed: {}", String::from_utf8_lossy(&pr_output.stderr)));
+        style::print_info("You can create a PR manually through the GitHub website.");
+        return Ok(());
+    }
+    
+    let pr_url = String::from_utf8_lossy(&pr_output.stdout).trim().to_string();
+    style::print_success(&format!("Successfully created PR: {}", pr_url));
     
     Ok(())
 }
@@ -336,42 +396,45 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
-    let output_base = if !dry_run {
-        match output_dir {
-            Some(dir) => {
-                if dir.starts_with('/') {
-                    let out_path = Path::new(&dir);
-                    if !out_path.exists() {
-                        fs::create_dir_all(out_path).map_err(|e| {
-                            AppError::FileSystem { 
-                                path: out_path.to_path_buf(), 
-                                message: format!("Failed to create output directory: {}", e) 
-                            }
-                        })?;
-                    }
-                    Some(PathBuf::from(dir))
-                } else {
-                    let base_path = crate::output::path::ensure_base_output_dir()?;
-                    let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
-                    let delete_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "delete_comments")?;
-                    let final_dir = delete_comments_path.join(dir);
-                    
-                    if !final_dir.exists() {
-                        fs::create_dir_all(&final_dir).map_err(|e| {
-                            AppError::FileSystem { 
-                                path: final_dir.clone(), 
-                                message: format!("Failed to create output directory: {}", e) 
-                            }
-                        })?;
-                    }
-                    
-                    Some(final_dir)
+    // For test support, also allow output in dry-run mode
+    let output_base = match output_dir {
+        Some(dir) => {
+            if dir.starts_with('/') {
+                let out_path = Path::new(&dir);
+                if !out_path.exists() {
+                    fs::create_dir_all(out_path).map_err(|e| {
+                        AppError::FileSystem { 
+                            path: out_path.to_path_buf(), 
+                            message: format!("Failed to create output directory: {}", e) 
+                        }
+                    })?;
                 }
-            },
-            None => None,
+                Some(PathBuf::from(dir))
+            } else {
+                let base_path = crate::output::path::ensure_base_output_dir()?;
+                let date_path = crate::output::path::ensure_date_subdirectory(&base_path)?;
+                let delete_comments_path = crate::output::path::ensure_command_subdirectory(&date_path, "delete_comments")?;
+                let final_dir = delete_comments_path.join(dir);
+                
+                if !final_dir.exists() {
+                    fs::create_dir_all(&final_dir).map_err(|e| {
+                        AppError::FileSystem { 
+                            path: final_dir.clone(), 
+                            message: format!("Failed to create output directory: {}", e) 
+                        }
+                    })?;
+                }
+                
+                Some(final_dir)
+            }
+        },
+        None => {
+            if dry_run {
+                None
+            } else {
+                None
+            }
         }
-    } else {
-        None
     };
     
     if path.is_file() {
