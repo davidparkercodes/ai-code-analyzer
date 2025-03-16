@@ -114,7 +114,6 @@ fn execute_delete_comments_command(
     
     display_delete_results(&stats, start_time);
     
-    // Export the JSON output if there are comments to report
     if stats.removed_comments > 0 {
         export_json_results(&stats, &path)?;
     }
@@ -633,7 +632,6 @@ fn delete_file_content(
         if !is_python && trimmed.starts_with("//") && !trimmed.starts_with("///") {
             *comment_count += 1;
             
-            // Record the deleted comment for JSON output
             stats.deleted_comments.push(DeletedComment {
                 file: file_path.to_string(),
                 line: result.lines().count() + 1,
@@ -646,7 +644,6 @@ fn delete_file_content(
         if is_python && trimmed.starts_with("#") && !trimmed.starts_with("###") {
             *comment_count += 1;
             
-            // Record the deleted comment for JSON output
             stats.deleted_comments.push(DeletedComment {
                 file: file_path.to_string(),
                 line: result.lines().count() + 1,
@@ -657,7 +654,6 @@ fn delete_file_content(
         }
         
         if let Some((cleaned_line, removed_comment)) = process_line_preserving_strings(line, comment_regex, comment_count) {
-            // Record the end-of-line comment that was removed
             if !removed_comment.is_empty() {
                 stats.deleted_comments.push(DeletedComment {
                     file: file_path.to_string(),
@@ -823,7 +819,6 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
 
 /// Export deleted comments as JSON output file
 fn export_json_results(stats: &DeleteStats, base_dir: &str) -> AppResult<()> {
-    // Skip export if no comments were removed
     if stats.deleted_comments.is_empty() {
         style::print_info("ℹ️ No comments to export to JSON");
         return Ok(());
@@ -835,11 +830,9 @@ fn export_json_results(stats: &DeleteStats, base_dir: &str) -> AppResult<()> {
         "json"
     )?;
     
-    // Create pretty-printed JSON
     let json_content = serde_json::to_string_pretty(&stats.deleted_comments)
         .map_err(|e| AppError::Analysis(format!("Failed to serialize JSON: {}", e)))?;
     
-    // Write to file
     fs::write(&output_path, json_content).map_err(|e| AppError::FileSystem {
         path: output_path.clone(),
         message: format!("Failed to write JSON output: {}", e),
