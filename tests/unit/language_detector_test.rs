@@ -1,4 +1,4 @@
-use code_analyzer::metrics::language::LanguageDetector;
+use ai_code_analyzer::metrics::language::LanguageDetector;
 
 #[test]
 fn test_detect_by_filename() {

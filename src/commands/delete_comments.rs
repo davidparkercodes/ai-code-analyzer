@@ -418,7 +418,7 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
     })?;
     
     // Pattern to match and ignore (already updated with new name)
-    let ignore_pattern_str = r"aicodeanalyzer:\s*ignore";
+    let _ignore_pattern_str = r"aicodeanalyzer:\s*ignore";
     
     let output_base = match output_dir {
         Some(dir) => {

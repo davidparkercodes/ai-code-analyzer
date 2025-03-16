@@ -1,4 +1,4 @@
-use code_analyzer::analyzer::Analyzer;
+use ai_code_analyzer::analyzer::Analyzer;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;

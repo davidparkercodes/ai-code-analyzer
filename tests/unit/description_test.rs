@@ -1,6 +1,6 @@
-use code_analyzer::description::CodeDescriptor;
-use code_analyzer::ai::AiConfig;
-use code_analyzer::util::parallel::ParallelProcessing;
+use ai_code_analyzer::description::CodeDescriptor;
+use ai_code_analyzer::ai::AiConfig;
+use ai_code_analyzer::util::parallel::ParallelProcessing;
 use tempfile::TempDir;
 use std::fs;
 use tokio;
@@ -45,8 +45,8 @@ pub fn subtract(a: i32, b: i32) -> i32 {
     fs::write(
         temp_path.join("tests/test_math.rs"),
         r#"
-use code_analyzer::add;
-use code_analyzer::subtract;
+use ai_code_analyzer::add;
+use ai_code_analyzer::subtract;
 
 #[test]
 fn test_add() {

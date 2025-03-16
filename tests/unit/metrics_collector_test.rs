@@ -1,4 +1,4 @@
-use code_analyzer::metrics::collector::MetricsCollector;
+use ai_code_analyzer::metrics::collector::MetricsCollector;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;

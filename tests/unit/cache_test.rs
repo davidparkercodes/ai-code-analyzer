@@ -1,5 +1,5 @@
-use code_analyzer::cache::AnalysisCache;
-use code_analyzer::metrics::models::FileMetrics;
+use ai_code_analyzer::cache::AnalysisCache;
+use ai_code_analyzer::metrics::models::FileMetrics;
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;

@@ -1,5 +1,5 @@
 use std::env;
-use code_analyzer::ai::{AiConfig, AiVendor, ModelTier};
+use ai_code_analyzer::ai::{AiConfig, AiVendor, ModelTier};
 
 #[test]
 fn test_default_config() {

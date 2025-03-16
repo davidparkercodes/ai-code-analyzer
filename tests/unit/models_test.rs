@@ -1,4 +1,4 @@
-use code_analyzer::metrics::models::{CodeMetrics, LanguageMetrics};
+use ai_code_analyzer::metrics::models::{CodeMetrics, LanguageMetrics};
 
 #[test]
 fn test_language_metrics_new() {
