@@ -11,6 +11,7 @@ A high-performance CLI tool built in Rust that analyzes and extracts insights fr
 - Circular dependency detection
 - Exclusion of test files from dependency analysis
 - Export to DOT format for visualizing dependencies with tools like Graphviz
+- Architecture diagram generation in multiple formats (DOT, PlantUML, Mermaid, C4)
 - AI-powered code analysis with multi-provider support
 
 ## Installation
@@ -43,6 +44,12 @@ aicodeanalyzer dependencies /path/to/code --output deps.dot
 
 # Visualize with Graphviz (if installed)
 aicodeanalyzer dependencies /path/to/code --output deps.dot && dot -Tpng deps.dot -o deps.png
+
+# Generate architecture diagrams in different formats
+aicodeanalyzer architecture-diagram /path/to/code --format dot
+aicodeanalyzer architecture-diagram /path/to/code --format plantuml --group-by-module
+aicodeanalyzer architecture-diagram /path/to/code --format mermaid --detail high
+aicodeanalyzer architecture-diagram /path/to/code --format c4 --focus src/core
 ```
 
 ## Metrics
@@ -68,6 +75,34 @@ The dependencies command analyzes import statements and module references:
 - **Top Dependencies**: Shows files with the most connections to other files
 
 Test files are excluded from dependency analysis to give a clearer picture of your production code architecture.
+
+## Architecture Diagrams
+
+The architecture-diagram command generates visual representations of your codebase structure:
+
+```bash
+aicodeanalyzer architecture-diagram /path/to/code [options]
+```
+
+### Options
+
+- `--format <format>`: Diagram format (dot, plantuml, mermaid, c4) [default: dot]
+- `--detail <level>`: Detail level (high, medium, low) [default: medium]
+- `--group-by-module`: Group files by their parent module/directory
+- `--include-tests`: Include test files in the architecture diagram
+- `--focus <path>`: Focus on a specific module or directory
+- `--output-path <path>`: Custom output file path
+- `--no-output`: Display diagram in console instead of saving to file
+- `--no-parallel`: Disable parallel processing
+
+### Supported Formats
+
+- **DOT**: Standard GraphViz format, great for complex visualizations
+- **PlantUML**: Text-based UML diagram format with multiple rendering options
+- **Mermaid**: JavaScript-based diagramming tool that works in Markdown
+- **C4**: Architecture diagram format focusing on containers and components
+
+After generating a diagram, the tool provides instructions for rendering it using the appropriate tools.
 
 ## Cross-Platform Building
 

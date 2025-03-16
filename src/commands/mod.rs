@@ -5,6 +5,7 @@ mod style;
 mod describe;
 pub mod delete_comments;
 mod clean_code_analyze;
+pub mod architecture_diagram;
 
 use clap::{Parser, Subcommand};
 
@@ -162,6 +163,45 @@ pub enum Commands {
         #[arg(long = "analyze-level", default_value = "medium")]
         analyze_level: String,
     },
+    /// Generate architecture diagrams from code analysis
+    #[command(name = "architecture-diagram")]
+    ArchitectureDiagram {
+        /// Path to analyze (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        
+        /// Disable auto-saving of the output file
+        #[arg(long)]
+        no_output: bool,
+        
+        /// Custom output path (optional, uses default structured output if not specified)
+        #[arg(short, long)]
+        output_path: Option<String>,
+        
+        /// Disable parallel processing for large codebases
+        #[arg(long)]
+        no_parallel: bool,
+        
+        /// Diagram format (dot, plantuml, mermaid, c4)
+        #[arg(long, default_value = "dot")]
+        format: String,
+        
+        /// Diagram detail level (high, medium, low)
+        #[arg(long, default_value = "medium")]
+        detail: String,
+        
+        /// Include test files in the architecture diagram
+        #[arg(long)]
+        include_tests: bool,
+        
+        /// Group by module/package instead of individual files
+        #[arg(long)]
+        group_by_module: bool,
+        
+        /// Focus on specific module or directory (relative to analysis path)
+        #[arg(long)]
+        focus: Option<String>,
+    },
 }
 
 pub async fn execute(cli: Cli) -> i32 {
@@ -179,5 +219,7 @@ pub async fn execute(cli: Cli) -> i32 {
             delete_comments::execute(path, language, no_output, output_path, no_parallel, no_git, force, dry_run),
         Commands::CleanCodeAnalyze { path, output_path, no_parallel, ai_level, actionable_only, analyze_level } => 
             clean_code_analyze::execute(path, output_path, no_parallel, ai_level, actionable_only, analyze_level).await,
+        Commands::ArchitectureDiagram { path, no_output, output_path, no_parallel, format, detail, include_tests, group_by_module, focus } => 
+            architecture_diagram::execute(path, no_output, output_path, no_parallel, format, detail, include_tests, group_by_module, focus).await,
     }
 }
