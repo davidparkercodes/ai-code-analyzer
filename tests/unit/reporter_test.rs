@@ -1,5 +1,5 @@
-use code_analyzer::metrics::models::{CodeMetrics, LanguageMetrics};
-use code_analyzer::metrics::reporter::MetricsReporter;
+use ai_code_analyzer::metrics::models::{CodeMetrics, LanguageMetrics};
+use ai_code_analyzer::metrics::reporter::MetricsReporter;
 
 #[test]
 fn test_reporter_new() {

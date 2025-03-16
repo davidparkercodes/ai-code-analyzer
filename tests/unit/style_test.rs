@@ -1,5 +1,5 @@
-use code_analyzer::style_analyzer::StyleAnalyzer;
-use code_analyzer::style_analyzer::pattern::{StylePattern, StyleRule, IndentationStyle, NamingConvention};
+use ai_code_analyzer::style_analyzer::StyleAnalyzer;
+use ai_code_analyzer::style_analyzer::pattern::{StylePattern, StyleRule, IndentationStyle, NamingConvention};
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;

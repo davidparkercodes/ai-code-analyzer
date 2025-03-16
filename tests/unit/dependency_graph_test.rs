@@ -1,4 +1,4 @@
-use code_analyzer::dependency::dependency_graph::DependencyGraph;
+use ai_code_analyzer::dependency::dependency_graph::DependencyGraph;
 
 #[test]
 fn test_dependency_graph_creation() {
