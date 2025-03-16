@@ -234,7 +234,6 @@ fn scan_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBu
 fn get_source_files(path: &str, parallel_enabled: bool) -> AppResult<Vec<PathBuf>> {
     let all_files = get_all_source_files(path, parallel_enabled).map_err(|e| map_scan_error(e))?;
 
-    // Filter out known binary and cache files at scan time
     let text_files: Vec<PathBuf> = all_files
         .into_iter()
         .filter(|path| !should_skip_file(path))
@@ -378,7 +377,6 @@ async fn analyze_code_batch(
     let file_contents = collect_file_contents(batch.files)?;
     let valid_file_count = file_contents.len();
 
-    // Skip batch if no valid files
     if valid_file_count == 0 {
         style::print_warning(&format!(
             "Skipping batch #{} - no valid files to analyze",
@@ -411,7 +409,6 @@ async fn analyze_code_batch(
         .await
         .map_err(|e| AppError::Ai(e))?;
 
-    // Add some debug information about the AI response
     if analysis.trim().is_empty() {
         style::print_warning("AI returned empty response");
     } else if !analysis.trim().starts_with("[") {
@@ -421,9 +418,7 @@ async fn analyze_code_batch(
     let elapsed = start_time.elapsed();
     style::print_info(&format!("⌛ AI analysis completed in {:.2?}", elapsed));
     
-    // Ensure the response is valid JSON array
     let processed_analysis = if !analysis.trim().starts_with("[") {
-        // Try to extract JSON from possibly markdown response
         if let Some(start) = analysis.find("[") {
             if let Some(end) = analysis.rfind("]") {
                 let json_str = &analysis[start..=end];
@@ -449,7 +444,6 @@ fn collect_file_contents(files: &[PathBuf]) -> AppResult<Vec<(String, String)>> 
     let mut valid_files = Vec::new();
 
     for file_path in files.iter() {
-        // Skip binary files and cache directories by default
         if should_skip_file(file_path) {
             style::print_info(&format!(
                 "Skipping binary/cache file: {}",
@@ -461,26 +455,21 @@ fn collect_file_contents(files: &[PathBuf]) -> AppResult<Vec<(String, String)>> 
         match read_file_with_path(file_path) {
             Ok(file_content) => valid_files.push(file_content),
             Err(error) => {
-                // Log the error but continue with other files
                 style::print_warning(&format!("Skipping file: {}", error));
             }
         }
     }
 
-    // Return an empty collection instead of an error if no valid files
-    // This allows the batch to be skipped gracefully
     Ok(valid_files)
 }
 
 fn should_skip_file(file_path: &PathBuf) -> bool {
     let path_str = file_path.to_string_lossy();
 
-    // Skip __pycache__ directory files
     if path_str.contains("__pycache__") {
         return true;
     }
 
-    // Skip common binary file extensions
     let is_binary = [
         ".pyc", ".exe", ".dll", ".so", ".dylib", ".bin", ".dat", ".jpg", ".jpeg", ".png", ".gif",
         ".class", ".jar", ".o", ".a",
@@ -615,16 +604,13 @@ fn convert_to_ordered_results(
     json_array.iter()
         .filter_map(|item| {
             if let serde_json::Value::Object(map) = item {
-                // Extract file path and score
                 let file = map.get("file")?.as_str()?.to_string();
                 let score = map.get("score")?.as_u64()? as u32;
                 
-                // Extract score explanation
                 let score_explanation = map.get("scoreExplanation")
                     .and_then(|s| s.as_str())
                     .map(|s| s.to_string());
                 
-                // Extract actionable items
                 let actionable_items = if let Some(serde_json::Value::Array(items)) = map.get("actionableItems") {
                     items.iter()
                         .filter_map(|item| {
@@ -639,7 +625,6 @@ fn convert_to_ordered_results(
                     Vec::new()
                 };
                 
-                // Extract strong points
                 let strong_points = extract_strong_points(map, actionable_only);
                 
                 Some(OrderedAnalysisResult {
@@ -665,7 +650,6 @@ fn export_batch_analysis(
     actionable_only: bool,
     analyze_level: &AnalyzeLevel,
 ) -> AppResult<()> {
-    // Parse JSON content
     let json_value = match parse_analysis_json(content) {
         Ok(value) => value,
         Err(message) => {
@@ -674,7 +658,6 @@ fn export_batch_analysis(
         }
     };
     
-    // Generate output path
     let path = generate_output_path(
         base_path,
         batch_number,
@@ -683,27 +666,23 @@ fn export_batch_analysis(
         analyze_level,
     )?;
     
-    // Count files in analysis
     let file_count = if let serde_json::Value::Array(ref array) = json_value {
         array.len()
     } else {
         0
     };
     
-    // Convert to ordered results
     let ordered_results = if let serde_json::Value::Array(array) = json_value {
         convert_to_ordered_results(&array, actionable_only)
     } else {
         Vec::new()
     };
     
-    // Format and write to file
     let formatted_content = serde_json::to_string_pretty(&ordered_results)
         .unwrap_or_else(|_| content.to_string());
     
     write_analysis_to_file(&path, &formatted_content)?;
     
-    // Log success
     log_export_success(batch_number, file_count, &path);
     
     Ok(())
