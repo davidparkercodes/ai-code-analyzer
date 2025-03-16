@@ -29,6 +29,7 @@ tracing-subscriber = "0.3"
 pulldown-cmark = "0.9.3"
 terminal_size = "0.2.6"
 chrono = "0.4"
+graphviz-rust = "0.6.6"
 
 [dev-dependencies]
 cargo-make = "0.37.24"

@@ -117,6 +117,8 @@ aicodeanalyzer architecture-diagram /path/to/code --format svg
 # 3. Select the generated SVG file
 ```
 
+Note: Unlike other diagram formats, generating SVG diagrams does not require any external tools since Graphviz is integrated directly into the application.
+
 After generating a diagram, the tool provides instructions for rendering it using the appropriate tools.
 
 ## Cross-Platform Building

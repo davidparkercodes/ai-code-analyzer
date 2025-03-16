@@ -2,7 +2,6 @@ use ai_code_analyzer::commands::architecture_diagram;
 use tempfile::TempDir;
 use std::path::Path;
 use std::fs;
-use std::process::Command;
 
 #[tokio::test]
 async fn test_architecture_diagram_command() {
@@ -104,34 +103,29 @@ async fn test_architecture_diagram_command() {
     assert!(dot_content.starts_with("digraph ArchitectureDiagram {"));
     assert!(dot_content.contains("rankdir=LR;"));
     
-    // Test the SVG format if Graphviz is installed
-    let has_graphviz = Command::new("dot").arg("-V").output().is_ok();
+    // Test with SVG format
+    let svg_output_path = output_dir.join("arch.svg").to_str().unwrap().to_string();
     
-    if has_graphviz {
-        // Test with SVG format
-        let svg_output_path = output_dir.join("arch.svg").to_str().unwrap().to_string();
-        
-        let result_svg = architecture_diagram::execute(
-            temp_path.clone(),
-            false, // no_output
-            Some(svg_output_path.clone()), // output_path
-            true, // no_parallel
-            "svg".to_string(), // format
-            "medium".to_string(), // detail
-            false, // include_tests
-            false, // group_by_module
-            None, // focus
-        ).await;
-        
-        // Verify the command succeeded
-        assert_eq!(result_svg, 0);
-        
-        // Verify the output file exists
-        assert!(Path::new(&svg_output_path).exists());
-        
-        // Verify the output file contains SVG content
-        let svg_content = fs::read_to_string(&svg_output_path).unwrap();
-        assert!(svg_content.contains("<svg"));
-        assert!(svg_content.contains("</svg>"));
-    }
+    let result_svg = architecture_diagram::execute(
+        temp_path.clone(),
+        false, // no_output
+        Some(svg_output_path.clone()), // output_path
+        true, // no_parallel
+        "svg".to_string(), // format
+        "medium".to_string(), // detail
+        false, // include_tests
+        false, // group_by_module
+        None, // focus
+    ).await;
+    
+    // Verify the command succeeded
+    assert_eq!(result_svg, 0);
+    
+    // Verify the output file exists
+    assert!(Path::new(&svg_output_path).exists());
+    
+    // Verify the output file contains SVG content
+    let svg_content = fs::read_to_string(&svg_output_path).unwrap();
+    assert!(svg_content.contains("<svg"));
+    assert!(svg_content.contains("</svg>"));
 }
