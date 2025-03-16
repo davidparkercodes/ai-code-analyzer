@@ -45,6 +45,7 @@ fn execute_metrics_command(
     Ok(())
 }
 
+// This is a test to delete this comment.
 fn initialize_metrics_collector(parallel_enabled: bool) -> MetricsCollector {
     MetricsCollector::new().enable_parallel_processing(parallel_enabled)
 }
