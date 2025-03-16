@@ -36,9 +36,9 @@ fn execute_delete_comments_command(
     force: bool,
     dry_run: bool
 ) -> AppResult<()> {
-    if language.to_lowercase() != "rust" {
+    if !["rust", "python"].contains(&language.to_lowercase().as_str()) {
         return Err(to_app_error(
-            format!("Language '{}' is not supported. Currently only 'rust' is supported.", language),
+            format!("Language '{}' is not supported. Currently only 'rust' and 'python' are supported.", language),
             AppErrorType::Internal
         ));
     }
@@ -236,6 +236,12 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
             "///",
             r"//.*aicodeanalyzer:\s*ignore"
         ),
+        "python" => (
+            "py",
+            r"#.+$",
+            "###",
+            r"#.*aicodeanalyzer:\s*ignore"
+        ),
         _ => {
             return Err(to_app_error(
                 format!("Language '{}' is not supported.", language),
@@ -391,6 +397,10 @@ fn delete_file_content(
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
+    // Extract the pattern from the regex to determine if we're looking for // or #
+    let pattern = comment_regex.as_str();
+    let is_python = pattern.starts_with("#");
+    
     for line in content.lines() {
         let trimmed = line.trim_start();
         
@@ -424,7 +434,14 @@ fn delete_file_content(
             continue;
         }
         
-        if trimmed.starts_with("//") && !trimmed.starts_with("///") {
+        // Handle Rust single-line comments
+        if !is_python && trimmed.starts_with("//") && !trimmed.starts_with("///") {
+            *comment_count += 1;
+            continue;
+        }
+        
+        // Handle Python single-line comments
+        if is_python && trimmed.starts_with("#") && !trimmed.starts_with("###") {
             *comment_count += 1;
             continue;
         }
@@ -453,13 +470,17 @@ fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
 
 /// Process a line of code, preserving string literals while removing end-of-line comments
 /// Returns Some(cleaned_line) if a comment was found and removed, None if no comments were found
-fn process_line_preserving_strings(line: &str, _comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
+fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
     let mut in_string = false;
     let mut escape_next = false;
     let chars = line.chars().collect::<Vec<_>>();
     let length = chars.len();
     
     let mut comment_pos = None;
+    
+    // Extract the pattern from the regex to determine if we're looking for // or #
+    let pattern = comment_regex.as_str();
+    let is_python = pattern.starts_with("#");
     
     for i in 0..length {
         let c = chars[i];
@@ -478,7 +499,17 @@ fn process_line_preserving_strings(line: &str, _comment_regex: &Regex, comment_c
                 in_string = !in_string;
             },
             
-            '/' if i + 1 < length && chars[i+1] == '/' && !in_string => {
+            // Handle Rust comments
+            '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string => {
+                let prefix = &line[0..i];
+                if !prefix.trim().is_empty() {
+                    comment_pos = Some(i);
+                    break;
+                }
+            },
+            
+            // Handle Python comments
+            '#' if is_python && !in_string => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
                     comment_pos = Some(i);
@@ -514,8 +545,10 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
     while orig_pos < original_lines.len() && preview_count < MAX_PREVIEW_LINES {
         let original_line = original_lines[orig_pos];
         
-        if original_line.trim_start().starts_with("//") && 
-           !original_line.trim_start().starts_with("///") && 
+        let trimmed = original_line.trim_start();
+        // Handle both Rust and Python comments
+        if ((trimmed.starts_with("//") && !trimmed.starts_with("///")) || 
+           (trimmed.starts_with("#") && !trimmed.starts_with("###"))) && 
            !original_line.contains("aicodeanalyzer: ignore") {
             println!("- {}", style::dimmed(original_line));
             orig_pos += 1;
@@ -527,7 +560,8 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
             let cleaned_line = cleaned_lines[clean_pos];
             
             if original_line != cleaned_line && 
-               (original_line.contains("//") || cleaned_line.contains("//")) {
+               (original_line.contains("//") || cleaned_line.contains("//") ||
+                original_line.contains("#") || cleaned_line.contains("#")) {
                 println!("- {}", style::dimmed(original_line));
                 println!("+ {}", style::success(cleaned_line));
                 orig_pos += 1;
@@ -545,7 +579,9 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
     
     for line in original_lines.iter() {
         let trimmed = line.trim_start();
-        if trimmed.starts_with("//") && !trimmed.starts_with("///") && !line.contains("aicodeanalyzer: ignore") {
+        if ((trimmed.starts_with("//") && !trimmed.starts_with("///")) || 
+            (trimmed.starts_with("#") && !trimmed.starts_with("###"))) && 
+            !line.contains("aicodeanalyzer: ignore") {
             total_line_changes += 1;
         }
     }
