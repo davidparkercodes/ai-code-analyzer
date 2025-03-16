@@ -1,12 +1,12 @@
 [package]
-name = "code-analyzer"
+name = "ai-code-analyzer"
 version = "0.1.0"
 edition = "2024"
 description = "AI-Powered Codebase Analysis Tool"
 authors = ["Your Name <your.email@example.com>"]
 
 [[bin]]
-name = "codeanalyzer"
+name = "aicodeanalyzer"
 path = "src/main.rs"
 
 [dependencies]

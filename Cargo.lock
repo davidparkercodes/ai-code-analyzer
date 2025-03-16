@@ -38,6 +38,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai-code-analyzer"
+version = "0.1.0"
+dependencies = [
+ "assert_cmd",
+ "async-trait",
+ "cargo-make",
+ "chrono",
+ "clap",
+ "config",
+ "dashmap",
+ "dotenv",
+ "ignore",
+ "predicates",
+ "pulldown-cmark",
+ "rayon",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terminal_size",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "walkdir",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -419,35 +448,6 @@ name = "cliparser"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74bd707b71a46260ab2b8951748cae3010445aced1dc000ef90d4156bcfad5a2"
-
-[[package]]
-name = "code-analyzer"
-version = "0.1.0"
-dependencies = [
- "assert_cmd",
- "async-trait",
- "cargo-make",
- "chrono",
- "clap",
- "config",
- "dashmap",
- "dotenv",
- "ignore",
- "predicates",
- "pulldown-cmark",
- "rayon",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "terminal_size",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "walkdir",
-]
 
 [[package]]
 name = "colorchoice"
