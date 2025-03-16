@@ -1,6 +1,6 @@
-# CodeAnalyzer
+# AI CodeAnalyzer
 
-A high-performance CLI tool built in Rust that analyzes and extracts insights from software codebases.
+A high-performance CLI tool built in Rust that analyzes and extracts insights from software codebases using AI.
 
 ## Features
 
@@ -19,8 +19,8 @@ A high-performance CLI tool built in Rust that analyzes and extracts insights fr
 
 ```bash
 # Clone the repository
-git clone https://github.com/davidparkercodes/code-analyzer.git
-cd code-analyzer
+git clone https://github.com/davidparkercodes/ai-code-analyzer.git
+cd ai-code-analyzer
 
 # Build and install
 cargo install --path .
@@ -30,19 +30,19 @@ cargo install --path .
 
 ```bash
 # Run full analysis (metrics + dependencies)
-codeanalyzer run /path/to/code
+aicodeanalyzer run /path/to/code
 
 # Get code metrics only
-codeanalyzer metrics /path/to/code
+aicodeanalyzer metrics /path/to/code
 
 # Analyze dependencies only
-codeanalyzer dependencies /path/to/code
+aicodeanalyzer dependencies /path/to/code
 
 # Export dependency graph to DOT format for visualization
-codeanalyzer dependencies /path/to/code --output deps.dot
+aicodeanalyzer dependencies /path/to/code --output deps.dot
 
 # Visualize with Graphviz (if installed)
-codeanalyzer dependencies /path/to/code --output deps.dot && dot -Tpng deps.dot -o deps.png
+aicodeanalyzer dependencies /path/to/code --output deps.dot && dot -Tpng deps.dot -o deps.png
 ```
 
 ## Metrics
@@ -161,7 +161,7 @@ Or simply run the provided script:
 
 ## AI Integration
 
-CodeAnalyzer supports multiple AI providers to enhance code analysis capabilities:
+AI CodeAnalyzer supports multiple AI providers to enhance code analysis capabilities:
 
 ### Supported Providers
 - **Anthropic** (Claude models)

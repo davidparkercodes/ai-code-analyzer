@@ -9,7 +9,7 @@ mod clean_code_analyze;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "codeanalyzer")]
+#[command(name = "aicodeanalyzer")]
 #[command(about = "AI-Powered Codebase Analysis Tool", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
