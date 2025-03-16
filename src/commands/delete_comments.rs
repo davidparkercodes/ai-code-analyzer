@@ -10,6 +10,20 @@ use std::process::Command;
 use walkdir::WalkDir;
 use regex::Regex;
 use chrono;
+use serde::{Serialize, Deserialize};
+use serde_json;
+
+/// Record of a deleted comment for JSON output
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeletedComment {
+    /// File path where the comment was removed
+    file: String,
+    /// Line number where the comment was removed
+    line: usize,
+    /// The actual comment text that was removed
+    comment_removed: String,
+}
 
 pub fn execute(
     path: String, 
@@ -99,6 +113,11 @@ fn execute_delete_comments_command(
     let stats = delete_comments(&path, &language, effective_output_dir, dry_run)?;
     
     display_delete_results(&stats, start_time);
+    
+    // Export the JSON output if there are comments to report
+    if stats.removed_comments > 0 {
+        export_json_results(&stats, &path)?;
+    }
     
     if !dry_run && no_git == false && stats.changed_files > 0 && effective_output_dir.is_none() {
         let is_git_repo = check_git_repository(&path_buf)?;
@@ -349,6 +368,8 @@ struct DeleteStats {
     processed_files: usize,
     changed_files: usize,
     removed_comments: usize,
+    /// Records of all deleted comments for JSON output
+    deleted_comments: Vec<DeletedComment>,
 }
 
 fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str>, dry_run: bool) -> AppResult<DeleteStats> {
@@ -365,6 +386,7 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
         processed_files: 0,
         changed_files: 0,
         removed_comments: 0,
+        deleted_comments: Vec::new(),
     };
     
     let (file_extension, comment_pattern, doc_comment_prefix, ignore_pattern) = match language.to_lowercase().as_str() {
@@ -442,7 +464,7 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
+                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count, path.to_str().unwrap_or(""), &mut stats);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -496,7 +518,7 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
                 stats.processed_files += 1;
                 
                 let mut comment_count = 0;
-                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count);
+                let cleaned_content = delete_file_content(&content, &comment_regex, &ignore_regex, doc_comment_prefix, &mut comment_count, file_path.to_str().unwrap_or(""), &mut stats);
                 
                 if comment_count > 0 {
                     stats.changed_files += 1;
@@ -566,7 +588,9 @@ fn delete_file_content(
     comment_regex: &Regex, 
     ignore_regex: &Regex, 
     doc_comment_prefix: &str,
-    comment_count: &mut usize
+    comment_count: &mut usize,
+    file_path: &str,
+    stats: &mut DeleteStats
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
@@ -608,15 +632,40 @@ fn delete_file_content(
         
         if !is_python && trimmed.starts_with("//") && !trimmed.starts_with("///") {
             *comment_count += 1;
+            
+            // Record the deleted comment for JSON output
+            stats.deleted_comments.push(DeletedComment {
+                file: file_path.to_string(),
+                line: result.lines().count() + 1,
+                comment_removed: line.to_string(),
+            });
+            
             continue;
         }
         
         if is_python && trimmed.starts_with("#") && !trimmed.starts_with("###") {
             *comment_count += 1;
+            
+            // Record the deleted comment for JSON output
+            stats.deleted_comments.push(DeletedComment {
+                file: file_path.to_string(),
+                line: result.lines().count() + 1,
+                comment_removed: line.to_string(),
+            });
+            
             continue;
         }
         
-        if let Some(cleaned_line) = process_line_preserving_strings(line, comment_regex, comment_count) {
+        if let Some((cleaned_line, removed_comment)) = process_line_preserving_strings(line, comment_regex, comment_count) {
+            // Record the end-of-line comment that was removed
+            if !removed_comment.is_empty() {
+                stats.deleted_comments.push(DeletedComment {
+                    file: file_path.to_string(),
+                    line: result.lines().count() + 1,
+                    comment_removed: removed_comment,
+                });
+            }
+            
             result.push_str(&cleaned_line);
             result.push('\n');
         } else {
@@ -645,8 +694,8 @@ fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
 }
 
 /// Process a line of code, preserving string literals while removing end-of-line comments
-/// Returns Some(cleaned_line) if a comment was found and removed, None if no comments were found
-fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<String> {
+/// Returns Some((cleaned_line, removed_comment)) if a comment was found and removed, None if no comments were found
+fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<(String, String)> {
     let mut in_string = false;
     let mut escape_next = false;
     let chars = line.chars().collect::<Vec<_>>();
@@ -697,7 +746,8 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     if let Some(pos) = comment_pos {
         *comment_count += 1;
         let cleaned = line[0..pos].trim_end().to_string();
-        return Some(cleaned);
+        let comment = line[pos..].trim_end().to_string();
+        return Some((cleaned, comment));
     }
     
     None
@@ -769,4 +819,37 @@ fn print_comment_preview(original: &str, cleaned: &str, file_path: &str) {
     }
     
     println!();
+}
+
+/// Export deleted comments as JSON output file
+fn export_json_results(stats: &DeleteStats, base_dir: &str) -> AppResult<()> {
+    // Skip export if no comments were removed
+    if stats.deleted_comments.is_empty() {
+        style::print_info("ℹ️ No comments to export to JSON");
+        return Ok(());
+    }
+    
+    let output_path = crate::output::path::resolve_output_path(
+        "delete_comments",
+        base_dir,
+        "json"
+    )?;
+    
+    // Create pretty-printed JSON
+    let json_content = serde_json::to_string_pretty(&stats.deleted_comments)
+        .map_err(|e| AppError::Analysis(format!("Failed to serialize JSON: {}", e)))?;
+    
+    // Write to file
+    fs::write(&output_path, json_content).map_err(|e| AppError::FileSystem {
+        path: output_path.clone(),
+        message: format!("Failed to write JSON output: {}", e),
+    })?;
+    
+    style::print_success(&format!(
+        "📄 Exported {} deleted comments to JSON file: {}", 
+        stats.deleted_comments.len(),
+        output_path.display()
+    ));
+    
+    Ok(())
 }
