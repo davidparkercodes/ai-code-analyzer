@@ -290,7 +290,7 @@ fn generate_dot_diagram(
         }
         
         // Add edges between nodes
-        for (module, deps) in module_dependencies.iter() {
+        for (_module, deps) in module_dependencies.iter() {
             for (from, to_list) in deps.iter() {
                 for to in to_list {
                     // Skip self-references if detail level is low
@@ -308,7 +308,7 @@ fn generate_dot_diagram(
         }
     } else {
         // Add nodes
-        for (from, to_list) in dependencies.iter() {
+        for (from, _) in dependencies.iter() {
             let file_name = extract_file_name(from);
             
             // Skip if not in focus
