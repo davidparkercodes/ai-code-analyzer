@@ -62,17 +62,17 @@ fn execute_delete_comments_command(
     }
     
     if is_git_repo && !dry_run && !no_git {
-        style::print_header("\nGit Operations");
-        style::print_info("This command will:");
-        style::print_info("1. Create a new branch for the changes");
-        style::print_info("2. Delete comments from your code files");
-        style::print_info("3. Commit the changes to the new branch");
-        style::print_info("4. Push the branch to your remote repository");
-        style::print_info("5. Create a PR for review (if GitHub CLI is available)");
+        style::print_header("\n🔄 Git Operations");
+        style::print_info("ℹ️ This command will:");
+        style::print_info("1️⃣ Create a new branch for the changes");
+        style::print_info("2️⃣ Delete comments from your code files");
+        style::print_info("3️⃣ Commit the changes to the new branch");
+        style::print_info("4️⃣ Push the branch to your remote repository");
+        style::print_info("5️⃣ Create a PR for review (if GitHub CLI is available)");
     }
     
     if !dry_run && !confirm_operation(is_git_repo)? {
-        style::print_info("Operation cancelled by user.");
+        style::print_info("❌ Operation cancelled by user.");
         return Ok(());
     }
     
@@ -83,7 +83,7 @@ fn execute_delete_comments_command(
     }
     
     if dry_run {
-        style::print_info("Running in dry-run mode. No files will be modified.");
+        style::print_info("🔍 Running in dry-run mode. No files will be modified.");
     }
     
     display_delete_header(&path, &language);
@@ -136,10 +136,10 @@ fn check_git_repository(path: &Path) -> AppResult<bool> {
 
 fn confirm_operation(is_git_repo: bool) -> AppResult<bool> {
     if is_git_repo {
-        style::print_warning("Are you sure you want to delete comments from your code? (y/N): ");
+        style::print_warning("⚠️ Are you sure you want to delete comments from your code? (y/N): ");
     } else {
-        style::print_warning("No git repository detected. Changes will be made to a separate output directory.");
-        style::print_warning("Are you sure you want to continue? (y/N): ");
+        style::print_warning("⚠️ No git repository detected. Changes will be made to a separate output directory.");
+        style::print_warning("⚠️ Are you sure you want to continue? (y/N): ");
     }
     
     io::stdout().flush().map_err(AppError::Io)?;
@@ -152,7 +152,7 @@ fn confirm_operation(is_git_repo: bool) -> AppResult<bool> {
 }
 
 fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
-    style::print_info(&format!("Creating git branch: {}", branch_name));
+    style::print_info(&format!("🔄 Creating git branch: {}", branch_name));
     
     let branch_check = Command::new("git")
         .arg("-C")
@@ -164,7 +164,7 @@ fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
         .map_err(AppError::Io)?;
     
     if branch_check.status.success() {
-        style::print_warning(&format!("Branch '{}' already exists. Using existing branch.", branch_name));
+        style::print_warning(&format!("⚠️ Branch '{}' already exists. Using existing branch.", branch_name));
         
         let checkout_output = Command::new("git")
             .arg("-C")
@@ -198,12 +198,12 @@ fn create_git_branch(path: &Path, branch_name: &str) -> AppResult<()> {
         }
     }
     
-    style::print_success(&format!("Now working on branch: {}", branch_name));
+    style::print_success(&format!("✅ Now working on branch: {}", branch_name));
     Ok(())
 }
 
 fn handle_git_operations(path: &Path) -> AppResult<()> {
-    style::print_header("\nGit Operations");
+    style::print_header("\n🔄 Git Operations");
     
     let output = Command::new("git")
         .arg("-C")
@@ -220,11 +220,12 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         .collect::<Vec<String>>();
     
     if modified_files.is_empty() {
-        style::print_info("No files were modified that need to be committed.");
+        style::print_warning("⚠️ No files were modified that need to be committed.");
+        style::print_info("ℹ️ No PR will be created since there are no changes.");
         return Ok(());
     }
     
-    style::print_info(&format!("Adding {} modified files to git...", modified_files.len()));
+    style::print_info(&format!("📂 Adding {} modified files to git...", modified_files.len()));
     
     let mut git_add = Command::new("git");
     git_add.arg("-C").arg(path).arg("add");
@@ -242,7 +243,7 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         ));
     }
     
-    style::print_info("Creating commit...");
+    style::print_info("📝 Creating commit...");
     
     let commit_output = Command::new("git")
         .arg("-C")
@@ -260,9 +261,9 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         ));
     }
     
-    style::print_success("Successfully committed changes to git repository.");
+    style::print_success("✅ Successfully committed changes to git repository.");
     
-    style::print_info("Pushing changes to remote repository...");
+    style::print_info("⬆️ Pushing changes to remote repository...");
     
     let branch_output = Command::new("git")
         .arg("-C")
@@ -299,17 +300,17 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         ));
     }
     
-    style::print_success("Successfully pushed changes to remote repository.");
+    style::print_success("✅ Successfully pushed changes to remote repository.");
     
-    style::print_info("Creating pull request...");
+    style::print_info("🔄 Creating pull request...");
     
     let gh_check = Command::new("which")
         .arg("gh")
         .output();
     
     if gh_check.is_err() || !gh_check.unwrap().status.success() {
-        style::print_warning("GitHub CLI not found. Skipping PR creation.");
-        style::print_info("To create a PR manually, visit your repository on GitHub.");
+        style::print_warning("⚠️ GitHub CLI not found. Skipping PR creation.");
+        style::print_info("ℹ️ To create a PR manually, visit your repository on GitHub.");
         return Ok(());
     }
     
@@ -328,20 +329,20 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         .map_err(AppError::Io)?;
     
     if !pr_output.status.success() {
-        style::print_warning(&format!("PR creation failed: {}", String::from_utf8_lossy(&pr_output.stderr)));
-        style::print_info("You can create a PR manually through the GitHub website.");
+        style::print_warning(&format!("⚠️ PR creation failed: {}", String::from_utf8_lossy(&pr_output.stderr)));
+        style::print_info("ℹ️ You can create a PR manually through the GitHub website.");
         return Ok(());
     }
     
     let pr_url = String::from_utf8_lossy(&pr_output.stdout).trim().to_string();
-    style::print_success(&format!("Successfully created PR: {}", pr_url));
+    style::print_success(&format!("✅ Successfully created PR: {}", pr_url));
     
     Ok(())
 }
 
 fn display_delete_header(directory_path: &str, language: &str) {
-    style::print_header(&format!("Deleting Comments from {} Files", language.to_uppercase()));
-    style::print_info(&format!("Analyzing {} files in directory: {}", language, directory_path));
+    style::print_header(&format!("🗑️ Deleting Comments from {} Files", language.to_uppercase()));
+    style::print_info(&format!("🔍 Analyzing {} files in directory: {}", language, directory_path));
 }
 
 struct DeleteStats {
@@ -630,11 +631,17 @@ fn delete_file_content(
 fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
     let elapsed = start_time.elapsed();
     
-    style::print_header("\nComment Deletion Complete");
-    println!("Files processed: {}", stats.processed_files);
-    println!("Files changed: {}", stats.changed_files);
-    println!("Comments removed: {}", stats.removed_comments);
-    style::print_success(&format!("Deletion completed in {:.2?}", elapsed));
+    style::print_header("\n✅ Comment Deletion Complete");
+    println!("📁 Files processed: {}", stats.processed_files);
+    println!("🔄 Files changed: {}", stats.changed_files);
+    println!("🗑️ Comments removed: {}", stats.removed_comments);
+    
+    if stats.changed_files == 0 {
+        style::print_warning("⚠️ No files were changed - no comments found for deletion.");
+        style::print_info("ℹ️ No PR will be created since there are no changes.");
+    }
+    
+    style::print_success(&format!("⏱️ Deletion completed in {:.2?}", elapsed));
 }
 
 /// Process a line of code, preserving string literals while removing end-of-line comments
