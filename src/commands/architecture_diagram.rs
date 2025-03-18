@@ -6,9 +6,8 @@ use crate::output::style;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
-use graphviz_rust::cmd::{CommandArg, Format};
-use graphviz_rust::{exec, parse};
-use graphviz_rust::printer::PrinterContext;
+use std::io::Write;
+use std::process::{Command, Stdio};
 use tracing::{info, error, warn};
 
 pub async fn execute(
@@ -651,34 +650,72 @@ fn generate_svg_diagram(
     // First generate a DOT diagram
     let dot_content = generate_dot_diagram(dependencies, detail_level, group_by_module, focus);
     
-    // Use graphviz-rust to convert DOT to SVG
-    match convert_dot_to_svg(&dot_content) {
-        Ok(svg) => svg,
-        Err(err) => {
-            warn!("Failed to convert DOT diagram to SVG: {}", err);
-            format!(
-                "<!-- Failed to generate SVG: {} -->\n<svg width=\"300\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n  <text x=\"10\" y=\"50\" font-family=\"sans-serif\">Error: {}</text>\n</svg>",
-                err.replace('"', "&quot;"),
-                err.replace('"', "&quot;")
-            )
+    // Check if Graphviz is installed
+    match Command::new("dot").arg("-V").output() {
+        Ok(_) => {
+            // Graphviz is installed, use it to convert DOT to SVG
+            match convert_dot_to_svg(&dot_content) {
+                Ok(svg) => svg,
+                Err(err) => {
+                    warn!("Failed to convert DOT diagram to SVG: {}", err);
+                    format!(
+                        "<!-- Failed to generate SVG: {} -->\n<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect width=\"500\" height=\"200\" fill=\"#f8f8f8\" stroke=\"#ccc\" stroke-width=\"1\"/>\n  <text x=\"20\" y=\"40\" font-family=\"sans-serif\" font-size=\"16\" fill=\"#333\">Error: {}</text>\n  <text x=\"20\" y=\"70\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">Please ensure Graphviz is properly configured.</text>\n</svg>",
+                        err, err
+                    )
+                }
+            }
+        },
+        Err(_) => {
+            // Graphviz is not installed
+            warn!("Graphviz (dot) is not installed. Cannot generate SVG diagram.");
+            let error_svg = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n") +
+                "<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
+                "  <rect width=\"500\" height=\"200\" fill=\"#f8f8f8\" stroke=\"#ccc\" stroke-width=\"1\"/>\n" +
+                "  <text x=\"20\" y=\"40\" font-family=\"sans-serif\" font-size=\"16\" fill=\"#333\">Error: Graphviz (dot) is not installed</text>\n" +
+                "  <text x=\"20\" y=\"70\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">To generate SVG diagrams:</text>\n" +
+                "  <text x=\"20\" y=\"100\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">1. Install Graphviz from https://graphviz.org/download/</text>\n" +
+                "  <text x=\"20\" y=\"130\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">2. Make sure 'dot' command is available in your PATH</text>\n" +
+                "  <text x=\"20\" y=\"160\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">3. Run the command again</text>\n" +
+                "</svg>";
+            error_svg
         }
     }
 }
 
 fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
-    // Parse the DOT content
-    let graph = match parse(dot_content) {
-        Ok(g) => g,
-        Err(e) => return Err(format!("Failed to parse DOT graph: {:?}", e)),
-    };
+    // Create a dot process
+    let mut process = match Command::new("dot")
+        .arg("-Tsvg")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn() {
+            Ok(p) => p,
+            Err(e) => return Err(format!("Failed to spawn Graphviz: {}", e)),
+        };
     
-    // Set up command arguments for SVG output
-    let args = vec![CommandArg::Format(Format::Svg)];
+    // Write DOT content to its stdin
+    if let Some(mut stdin) = process.stdin.take() {
+        if let Err(e) = stdin.write_all(dot_content.as_bytes()) {
+            return Err(format!("Failed to write to Graphviz stdin: {}", e));
+        }
+        // stdin will be closed when dropped
+    }
     
-    // Convert to SVG
-    match exec(graph, &mut PrinterContext::default(), args) {
-        Ok(svg) => Ok(svg),
-        Err(e) => Err(format!("Failed to generate SVG: {:?}", e)),
+    // Get output
+    match process.wait_with_output() {
+        Ok(output) => {
+            if output.status.success() {
+                match String::from_utf8(output.stdout) {
+                    Ok(svg) => Ok(svg),
+                    Err(e) => Err(format!("Invalid UTF-8 in SVG output: {}", e)),
+                }
+            } else {
+                let error = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Graphviz error: {}", error))
+            }
+        },
+        Err(e) => Err(format!("Failed to get Graphviz output: {}", e)),
     }
 }
 
@@ -783,6 +820,17 @@ fn suggest_visualization(format: &str, output_file: &Path) {
             println!("   - Open LucidChart and create a new diagram");
             println!("   - Click on File → Import → SVG");
             println!("   - Select the generated SVG file ({})", output_file.display());
+            
+            // Check if the file contains an error message
+            if let Ok(content) = fs::read_to_string(output_file) {
+                if content.contains("<!-- Failed to generate SVG") {
+                    println!("\nNOTE: The SVG generation appears to have encountered an error.");
+                    println!("Please ensure Graphviz is installed on your system:");
+                    println!("- For MacOS: brew install graphviz");
+                    println!("- For Ubuntu/Debian: sudo apt-get install graphviz");
+                    println!("- For Windows: winget install graphviz");
+                }
+            }
         }
         _ => {}
     }
