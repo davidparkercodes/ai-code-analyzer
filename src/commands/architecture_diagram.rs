@@ -659,15 +659,14 @@ fn generate_svg_diagram(
                 Err(err) => {
                     warn!("Failed to convert DOT diagram to SVG: {}", err);
                     format!(
-                        "<!-- Failed to generate SVG: {} -->\n<svg width=\"300\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\">\n  <text x=\"10\" y=\"50\" font-family=\"sans-serif\">Error: {}</text>\n</svg>",
-                        err.replace('"', "&quot;"),
-                        err.replace('"', "&quot;")
+                        "<!-- Failed to generate SVG: {} -->\n<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n  <rect width=\"500\" height=\"200\" fill=\"#f8f8f8\" stroke=\"#ccc\" stroke-width=\"1\"/>\n  <text x=\"20\" y=\"40\" font-family=\"sans-serif\" font-size=\"16\" fill=\"#333\">Error: {}</text>\n  <text x=\"20\" y=\"70\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#666\">Please ensure Graphviz is properly configured.</text>\n</svg>",
+                        err, err
                     )
                 }
             }
         },
         Err(_) => {
-            // Graphviz is not installed, provide an error message as SVG
+            // Graphviz is not installed
             warn!("Graphviz (dot) is not installed. Cannot generate SVG diagram.");
             let error_svg = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n") +
                 "<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
@@ -689,6 +688,7 @@ fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
         .arg("-Tsvg")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn() {
             Ok(p) => p,
             Err(e) => return Err(format!("Failed to spawn Graphviz: {}", e)),
@@ -820,6 +820,17 @@ fn suggest_visualization(format: &str, output_file: &Path) {
             println!("   - Open LucidChart and create a new diagram");
             println!("   - Click on File → Import → SVG");
             println!("   - Select the generated SVG file ({})", output_file.display());
+            
+            // Check if the file contains an error message
+            if let Ok(content) = fs::read_to_string(output_file) {
+                if content.contains("<!-- Failed to generate SVG") {
+                    println!("\nNOTE: The SVG generation appears to have encountered an error.");
+                    println!("Please ensure Graphviz is installed on your system:");
+                    println!("- For MacOS: brew install graphviz");
+                    println!("- For Ubuntu/Debian: sudo apt-get install graphviz");
+                    println!("- For Windows: winget install graphviz");
+                }
+            }
         }
         _ => {}
     }

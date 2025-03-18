@@ -117,6 +117,11 @@ aicodeanalyzer architecture-diagram /path/to/code --format svg
 # 3. Select the generated SVG file
 ```
 
+Note: While the SVG generation is integrated into the application, you still need to install the Graphviz library on your system:
+- For MacOS: `brew install graphviz`
+- For Ubuntu/Debian: `sudo apt-get install graphviz`
+- For Windows: `winget install graphviz`
+
 After generating a diagram, the tool provides instructions for rendering it using the appropriate tools.
 
 ## Cross-Platform Building
