@@ -602,15 +602,22 @@ fn delete_file_content(
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
+    // Handle UTF-8 BOM if present
+    let content_to_process = if content.starts_with('\u{feff}') {
+        &content[3..] // Skip the BOM (3 bytes)
+    } else {
+        content
+    };
+    
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
     let is_csharp = !is_python && file_path.ends_with(".cs");
     
     // Process multi-line comments for C# first
     let content = if is_csharp {
-        remove_multiline_comments(content.to_string(), comment_count, file_path, stats)
+        remove_multiline_comments(content_to_process.to_string(), comment_count, file_path, stats)
     } else {
-        content.to_string()
+        content_to_process.to_string()
     };
     
     for line in content.lines() {
@@ -707,8 +714,11 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
     let mut in_multiline_comment = false;
     let mut multiline_comment_start = 0;
     
-    let mut i = 0;
+    // Handle UTF-8 BOM if present (should be handled at file level, but double-check)
+    let has_bom = content.starts_with('\u{feff}');
+    
     let chars: Vec<char> = content.chars().collect();
+    let mut i = if has_bom { 1 } else { 0 }; // Skip BOM character if present
     
     while i < chars.len() {
         if in_multiline_comment {
@@ -814,7 +824,15 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     let mut in_string = false;
     let mut in_char = false;
     let mut escape_next = false;
-    let chars = line.chars().collect::<Vec<_>>();
+    
+    // Handle UTF-8 BOM if present (should already be removed at file level, but double-check)
+    let line_to_process = if line.starts_with('\u{feff}') {
+        &line[3..] // Skip the BOM (3 bytes)
+    } else {
+        line
+    };
+    
+    let chars = line_to_process.chars().collect::<Vec<_>>();
     let length = chars.len();
     
     let mut comment_pos = None;
@@ -874,8 +892,15 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     
     if let Some(pos) = comment_pos {
         *comment_count += 1;
-        let cleaned = line[0..pos].trim_end().to_string();
-        let comment = line[pos..].trim_end().to_string();
+        // Since we're using line_to_process chars for detection but original line for slicing,
+        // we need to adjust if the original line had a BOM
+        let adjusted_pos = if line.starts_with('\u{feff}') && line_to_process != line {
+            pos + 3 // Add BOM length
+        } else {
+            pos
+        };
+        let cleaned = line[0..adjusted_pos].trim_end().to_string();
+        let comment = line[adjusted_pos..].trim_end().to_string();
         return Some((cleaned, comment));
     }
     
