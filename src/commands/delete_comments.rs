@@ -76,13 +76,30 @@ fn execute_delete_comments_command(
     }
     
     if is_git_repo && !dry_run && !no_git {
+        // Check if the repository has an origin remote
+        let remote_check = Command::new("git")
+            .arg("-C")
+            .arg(&path_buf)
+            .arg("remote")
+            .arg("get-url")
+            .arg("origin")
+            .output()
+            .map_err(AppError::Io)?;
+        
+        let has_origin = remote_check.status.success();
+        
         style::print_header("\n🔄 Git Operations");
         style::print_info("ℹ️ This command will:");
         style::print_info("1️⃣ Create a new branch for the changes");
         style::print_info("2️⃣ Delete comments from your code files");
         style::print_info("3️⃣ Commit the changes to the new branch");
-        style::print_info("4️⃣ Push the branch to your remote repository");
-        style::print_info("5️⃣ Create a PR for review (if GitHub CLI is available)");
+        
+        if has_origin {
+            style::print_info("4️⃣ Push the branch to your remote repository");
+            style::print_info("5️⃣ Create a PR for review (if GitHub CLI is available)");
+        } else {
+            style::print_info("4️⃣ Skip pushing and PR creation (no remote origin configured)");
+        }
     }
     
     if !dry_run && !confirm_operation(is_git_repo)? {
@@ -281,6 +298,23 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     
     style::print_success("✅ Successfully committed changes to git repository.");
     
+    // Check if the repository has an origin remote
+    let remote_check = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .output()
+        .map_err(AppError::Io)?;
+    
+    let has_origin = remote_check.status.success();
+    
+    if !has_origin {
+        style::print_info("ℹ️ No remote origin configured. Skipping push and PR creation.");
+        return Ok(());
+    }
+    
     style::print_info("⬆️ Pushing changes to remote repository...");
     
     let branch_output = Command::new("git")
@@ -312,10 +346,9 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         .map_err(AppError::Io)?;
     
     if !push_output.status.success() {
-        return Err(to_app_error(
-            format!("Git push failed: {}", String::from_utf8_lossy(&push_output.stderr)),
-            AppErrorType::Internal
-        ));
+        style::print_warning(&format!("⚠️ Git push failed: {}", String::from_utf8_lossy(&push_output.stderr)));
+        style::print_info("ℹ️ Changes are committed locally, but couldn't be pushed to remote.");
+        return Ok(());
     }
     
     style::print_success("✅ Successfully pushed changes to remote repository.");
