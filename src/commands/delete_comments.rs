@@ -51,9 +51,9 @@ fn execute_delete_comments_command(
     _force: bool,
     dry_run: bool
 ) -> AppResult<()> {
-    if !["rust", "python", "csharp", "cs", "c#"].contains(&language.to_lowercase().as_str()) {
+    if !["rust", "python", "csharp", "cs", "c#", "typescript", "ts"].contains(&language.to_lowercase().as_str()) {
         return Err(to_app_error(
-            format!("Language '{}' is not supported. Currently only 'rust', 'python', and 'csharp' (or 'cs'/'c#') are supported.", language),
+            format!("Language '{}' is not supported. Currently only 'rust', 'python', 'csharp' (or 'cs'/'c#'), and 'typescript' (or 'ts') are supported.", language),
             AppErrorType::Internal
         ));
     }
@@ -440,6 +440,12 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
             "///",
             r"//.*aicodeanalyzer:\s*ignore"
         ),
+        "typescript" | "ts" => (
+            "ts",
+            r"//.+$",
+            "///",
+            r"//.*aicodeanalyzer:\s*ignore"
+        ),
         _ => {
             return Err(to_app_error(
                 format!("Language '{}' is not supported.", language),
@@ -645,9 +651,11 @@ fn delete_file_content(
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
     let is_csharp = !is_python && file_path.ends_with(".cs");
+    let is_typescript = !is_python && file_path.ends_with(".ts");
     
-    // Process multi-line comments for C# first
-    let content = if is_csharp {
+    // Process multi-line comments for C# and TypeScript first
+    
+    let content = if is_csharp || is_typescript {
         remove_multiline_comments(content_to_process.to_string(), comment_count, file_path, stats)
     } else {
         content_to_process.to_string()
@@ -662,8 +670,14 @@ fn delete_file_content(
             continue;
         }
 
-        // Handle XML documentation comments for C#
-        if is_csharp && trimmed.starts_with("///") {
+        // Handle XML documentation comments for C# and TypeScript
+        if (is_csharp || is_typescript) && trimmed.starts_with("///") {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+        // Handle JSDoc comments for TypeScript
+        else if is_typescript && trimmed.starts_with("/**") {
             result.push_str(line);
             result.push('\n');
             continue;
@@ -737,14 +751,17 @@ fn delete_file_content(
     result
 }
 
-/// Removes multi-line comments (/* ... */) from C# code
+/// Removes multi-line comments (/* ... */) from C# and TypeScript code
+/// Preserves JSDoc style comments (/** ... */) for TypeScript
 fn remove_multiline_comments(content: String, comment_count: &mut usize, file_path: &str, stats: &mut DeleteStats) -> String {
     let mut result = String::with_capacity(content.len());
     let mut in_string = false;
     let mut in_char = false;
     let mut in_verbatim_string = false;
+    let mut in_template_string = false;
     let mut escape_next = false;
     let mut in_multiline_comment = false;
+    let mut in_jsdoc_comment = false;
     let mut multiline_comment_start = 0;
     
     // Handle UTF-8 BOM if present (should be handled at file level, but double-check)
@@ -754,6 +771,21 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
     let mut i = if has_bom { 1 } else { 0 }; // Skip BOM character if present
     
     while i < chars.len() {
+        if in_jsdoc_comment {
+            // For JSDoc comments, we want to preserve them, not delete them
+            result.push(chars[i]);
+            
+            // Check if we're at the end of the JSDoc comment
+            if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '/' {
+                in_jsdoc_comment = false;
+                result.push(chars[i+1]); // Add the closing '/'
+                i += 2;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        
         if in_multiline_comment {
             // Look for the end of multiline comment
             if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '/' {
@@ -818,12 +850,26 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
                 result.push(chars[i]);
             },
             
-            '/' if !in_string && !in_char && i + 1 < chars.len() && chars[i+1] == '*' => {
-                // Found start of multiline comment
-                in_multiline_comment = true;
-                multiline_comment_start = i;
-                i += 2; // Skip both /* characters
-                continue;
+            '`' => {
+                if !in_string && !in_char {
+                    in_template_string = !in_template_string;
+                }
+                result.push(chars[i]);
+            },
+            
+            '/' if !in_string && !in_char && !in_template_string && i + 1 < chars.len() && chars[i+1] == '*' => {
+                // Check if this is a JSDoc comment (/** ... */)
+                if i + 2 < chars.len() && chars[i+2] == '*' {
+                    // This is a JSDoc comment, preserve it
+                    in_jsdoc_comment = true;
+                    result.push(chars[i]);
+                } else {
+                    // Found start of regular multiline comment
+                    in_multiline_comment = true;
+                    multiline_comment_start = i;
+                    i += 2; // Skip both /* characters
+                    continue;
+                }
             },
             
             _ => result.push(chars[i]),
@@ -856,6 +902,7 @@ fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
 fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<(String, String)> {
     let mut in_string = false;
     let mut in_char = false;
+    let mut in_template_string = false;
     let mut escape_next = false;
     
     // Handle UTF-8 BOM if present (should already be removed at file level, but double-check)
@@ -872,6 +919,7 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
+    let _is_typescript = !is_python && line_to_process.ends_with(".ts");
     
     for i in 0..length {
         let c = chars[i];
@@ -887,7 +935,7 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             },
             
             '"' => {
-                if !in_char {
+                if !in_char && !in_template_string {
                     // Handle C# verbatim strings @"..."
                     if i > 0 && chars[i-1] == '@' {
                         // For verbatim strings, only " followed by " is an escape sequence
@@ -899,11 +947,18 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
                 }
             },
             
+            '`' => {
+                // Handle TypeScript template literals
+                if !in_char && !in_string {
+                    in_template_string = !in_template_string;
+                }
+            },
+            
             '\'' if !in_string => {
                 in_char = !in_char;
             },
             
-            '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string && !in_char => {
+            '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string && !in_char && !in_template_string => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
                     comment_pos = Some(i);
