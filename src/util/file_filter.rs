@@ -39,7 +39,17 @@ impl FileFilter {
         path_str.ends_with("_test.py") ||
         path_str.ends_with("test_") ||
         path_str.contains("__tests__") ||
-        path_str.contains("__test__")
+        path_str.contains("__test__") ||
+        // C#/.NET specific test patterns
+        path_str.ends_with("Tests.cs") ||
+        path_str.ends_with("Test.cs") ||
+        path_str.contains(".Tests/") ||
+        path_str.contains(".Test/") ||
+        path_str.contains("/Tests.") ||
+        path_str.contains("/Test.") ||
+        path_str.contains(".MSTest.") ||
+        path_str.contains(".NUnit.") ||
+        path_str.contains(".XUnit.")
     }
     
     /// Checks if a file is a binary or media file that should be excluded

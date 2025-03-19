@@ -51,9 +51,9 @@ fn execute_delete_comments_command(
     _force: bool,
     dry_run: bool
 ) -> AppResult<()> {
-    if !["rust", "python"].contains(&language.to_lowercase().as_str()) {
+    if !["rust", "python", "csharp", "cs", "c#"].contains(&language.to_lowercase().as_str()) {
         return Err(to_app_error(
-            format!("Language '{}' is not supported. Currently only 'rust' and 'python' are supported.", language),
+            format!("Language '{}' is not supported. Currently only 'rust', 'python', and 'csharp' (or 'cs'/'c#') are supported.", language),
             AppErrorType::Internal
         ));
     }
@@ -76,13 +76,30 @@ fn execute_delete_comments_command(
     }
     
     if is_git_repo && !dry_run && !no_git {
+        // Check if the repository has an origin remote
+        let remote_check = Command::new("git")
+            .arg("-C")
+            .arg(&path_buf)
+            .arg("remote")
+            .arg("get-url")
+            .arg("origin")
+            .output()
+            .map_err(AppError::Io)?;
+        
+        let has_origin = remote_check.status.success();
+        
         style::print_header("\n🔄 Git Operations");
         style::print_info("ℹ️ This command will:");
         style::print_info("1️⃣ Create a new branch for the changes");
         style::print_info("2️⃣ Delete comments from your code files");
         style::print_info("3️⃣ Commit the changes to the new branch");
-        style::print_info("4️⃣ Push the branch to your remote repository");
-        style::print_info("5️⃣ Create a PR for review (if GitHub CLI is available)");
+        
+        if has_origin {
+            style::print_info("4️⃣ Push the branch to your remote repository");
+            style::print_info("5️⃣ Create a PR for review (if GitHub CLI is available)");
+        } else {
+            style::print_info("4️⃣ Skip pushing and PR creation (no remote origin configured)");
+        }
     }
     
     if !dry_run && !confirm_operation(is_git_repo)? {
@@ -281,6 +298,23 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     
     style::print_success("✅ Successfully committed changes to git repository.");
     
+    // Check if the repository has an origin remote
+    let remote_check = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .output()
+        .map_err(AppError::Io)?;
+    
+    let has_origin = remote_check.status.success();
+    
+    if !has_origin {
+        style::print_info("ℹ️ No remote origin configured. Skipping push and PR creation.");
+        return Ok(());
+    }
+    
     style::print_info("⬆️ Pushing changes to remote repository...");
     
     let branch_output = Command::new("git")
@@ -312,10 +346,9 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
         .map_err(AppError::Io)?;
     
     if !push_output.status.success() {
-        return Err(to_app_error(
-            format!("Git push failed: {}", String::from_utf8_lossy(&push_output.stderr)),
-            AppErrorType::Internal
-        ));
+        style::print_warning(&format!("⚠️ Git push failed: {}", String::from_utf8_lossy(&push_output.stderr)));
+        style::print_info("ℹ️ Changes are committed locally, but couldn't be pushed to remote.");
+        return Ok(());
     }
     
     style::print_success("✅ Successfully pushed changes to remote repository.");
@@ -400,6 +433,12 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
             r"#.+$",
             "###",
             r"#.*aicodeanalyzer:\s*ignore"
+        ),
+        "csharp" | "cs" | "c#" => (
+            "cs",
+            r"//.+$",
+            "///",
+            r"//.*aicodeanalyzer:\s*ignore"
         ),
         _ => {
             return Err(to_app_error(
@@ -596,8 +635,23 @@ fn delete_file_content(
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
+    // Handle UTF-8 BOM if present
+    let content_to_process = if content.starts_with('\u{feff}') {
+        &content[3..] // Skip the BOM (3 bytes)
+    } else {
+        content
+    };
+    
     let pattern = comment_regex.as_str();
     let is_python = pattern.starts_with("#");
+    let is_csharp = !is_python && file_path.ends_with(".cs");
+    
+    // Process multi-line comments for C# first
+    let content = if is_csharp {
+        remove_multiline_comments(content_to_process.to_string(), comment_count, file_path, stats)
+    } else {
+        content_to_process.to_string()
+    };
     
     for line in content.lines() {
         let trimmed = line.trim_start();
@@ -608,7 +662,14 @@ fn delete_file_content(
             continue;
         }
 
-        if trimmed.starts_with(doc_comment_prefix) {
+        // Handle XML documentation comments for C#
+        if is_csharp && trimmed.starts_with("///") {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+        // Handle doc comments for other languages
+        else if trimmed.starts_with(doc_comment_prefix) {
             result.push_str(line);
             result.push('\n');
             continue;
@@ -676,6 +737,104 @@ fn delete_file_content(
     result
 }
 
+/// Removes multi-line comments (/* ... */) from C# code
+fn remove_multiline_comments(content: String, comment_count: &mut usize, file_path: &str, stats: &mut DeleteStats) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut in_string = false;
+    let mut in_char = false;
+    let mut in_verbatim_string = false;
+    let mut escape_next = false;
+    let mut in_multiline_comment = false;
+    let mut multiline_comment_start = 0;
+    
+    // Handle UTF-8 BOM if present (should be handled at file level, but double-check)
+    let has_bom = content.starts_with('\u{feff}');
+    
+    let chars: Vec<char> = content.chars().collect();
+    let mut i = if has_bom { 1 } else { 0 }; // Skip BOM character if present
+    
+    while i < chars.len() {
+        if in_multiline_comment {
+            // Look for the end of multiline comment
+            if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '/' {
+                // Found end of multiline comment
+                in_multiline_comment = false;
+                *comment_count += 1;
+                
+                // Extract the full comment for stats
+                let comment_text = content.chars().skip(multiline_comment_start).take(i + 2 - multiline_comment_start).collect::<String>();
+                stats.deleted_comments.push(DeletedComment {
+                    file: file_path.to_string(),
+                    line: content[..multiline_comment_start].matches('\n').count() + 1,
+                    comment_removed: comment_text,
+                });
+                
+                i += 2; // Skip both */ characters
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        
+        if escape_next {
+            escape_next = false;
+            result.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        
+        match chars[i] {
+            '\\' if in_string || in_char => {
+                escape_next = true;
+                result.push(chars[i]);
+            },
+            
+            '"' => {
+                if !in_char {
+                    if in_verbatim_string {
+                        // In verbatim string, "" is an escape for "
+                        if i + 1 < chars.len() && chars[i+1] == '"' {
+                            result.push(chars[i]);
+                            result.push(chars[i+1]);
+                            i += 2;
+                            continue;
+                        }
+                        in_verbatim_string = false;
+                        in_string = false;
+                    } else if in_string {
+                        in_string = false;
+                    } else if i > 0 && chars[i-1] == '@' {
+                        in_verbatim_string = true;
+                        in_string = true;
+                    } else {
+                        in_string = true;
+                    }
+                }
+                result.push(chars[i]);
+            },
+            
+            '\'' if !in_string => {
+                in_char = !in_char;
+                result.push(chars[i]);
+            },
+            
+            '/' if !in_string && !in_char && i + 1 < chars.len() && chars[i+1] == '*' => {
+                // Found start of multiline comment
+                in_multiline_comment = true;
+                multiline_comment_start = i;
+                i += 2; // Skip both /* characters
+                continue;
+            },
+            
+            _ => result.push(chars[i]),
+        }
+        
+        i += 1;
+    }
+    
+    result
+}
+
 fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
     let elapsed = start_time.elapsed();
     
@@ -696,8 +855,17 @@ fn display_delete_results(stats: &DeleteStats, start_time: Instant) {
 /// Returns Some((cleaned_line, removed_comment)) if a comment was found and removed, None if no comments were found
 fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_count: &mut usize) -> Option<(String, String)> {
     let mut in_string = false;
+    let mut in_char = false;
     let mut escape_next = false;
-    let chars = line.chars().collect::<Vec<_>>();
+    
+    // Handle UTF-8 BOM if present (should already be removed at file level, but double-check)
+    let line_to_process = if line.starts_with('\u{feff}') {
+        &line[3..] // Skip the BOM (3 bytes)
+    } else {
+        line
+    };
+    
+    let chars = line_to_process.chars().collect::<Vec<_>>();
     let length = chars.len();
     
     let mut comment_pos = None;
@@ -714,15 +882,28 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
         }
         
         match c {
-            '\\' if in_string => {
+            '\\' if in_string || in_char => {
                 escape_next = true;
             },
             
             '"' => {
-                in_string = !in_string;
+                if !in_char {
+                    // Handle C# verbatim strings @"..."
+                    if i > 0 && chars[i-1] == '@' {
+                        // For verbatim strings, only " followed by " is an escape sequence
+                        // We'll simplify and just toggle the string state
+                        in_string = !in_string;
+                    } else {
+                        in_string = !in_string;
+                    }
+                }
             },
             
-            '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string => {
+            '\'' if !in_string => {
+                in_char = !in_char;
+            },
+            
+            '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string && !in_char => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
                     comment_pos = Some(i);
@@ -730,7 +911,7 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
                 }
             },
             
-            '#' if is_python && !in_string => {
+            '#' if is_python && !in_string && !in_char => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
                     comment_pos = Some(i);
@@ -744,8 +925,15 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     
     if let Some(pos) = comment_pos {
         *comment_count += 1;
-        let cleaned = line[0..pos].trim_end().to_string();
-        let comment = line[pos..].trim_end().to_string();
+        // Since we're using line_to_process chars for detection but original line for slicing,
+        // we need to adjust if the original line had a BOM
+        let adjusted_pos = if line.starts_with('\u{feff}') && line_to_process != line {
+            pos + 3 // Add BOM length
+        } else {
+            pos
+        };
+        let cleaned = line[0..adjusted_pos].trim_end().to_string();
+        let comment = line[adjusted_pos..].trim_end().to_string();
         return Some((cleaned, comment));
     }
     

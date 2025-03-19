@@ -112,6 +112,56 @@ fn test_delete_comments_from_python_files() {
 }
 
 #[test]
+fn test_delete_comments_from_csharp_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+    
+    create_csharp_test_files(temp_path);
+    
+    let output_dir = TempDir::new().unwrap();
+    let output_path = output_dir.path().to_str().unwrap().to_string();
+    
+    let exit_code = delete_comments::execute(
+        temp_path.to_str().unwrap().to_string(),
+        "csharp".to_string(),
+        false,
+        Some(output_path.clone()),
+        true,
+        true,
+        true,
+        true
+    );
+    
+    assert_eq!(exit_code, 0);
+    
+    let file1_path = temp_path.join("Test1.cs");
+    let _file2_path = temp_path.join("Test2.cs");
+    
+    let original_file1 = fs::read_to_string(&file1_path).unwrap();
+    assert!(original_file1.contains("// This is a comment"));
+    assert!(original_file1.contains("/* This is a multi-line comment"));
+    
+    if let Ok(entries) = fs::read_dir(&output_path) {
+        println!("C# files in output directory:");
+        for entry in entries.filter_map(|e| e.ok()) {
+            println!("  {}", entry.path().display());
+            
+            // Verify that comments have been removed in output files
+            if entry.path().extension().unwrap_or_default() == "cs" {
+                let processed_content = fs::read_to_string(entry.path()).unwrap();
+                assert!(!processed_content.contains("// This is a comment"));
+                assert!(!processed_content.contains("/* This is a multi-line comment"));
+                // But doc comments and ignored comments should remain
+                if entry.path().file_name().unwrap() == "Test2.cs" {
+                    assert!(processed_content.contains("/// <summary>"));
+                    assert!(processed_content.contains("aicodeanalyzer: ignore"));
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn test_ignores_test_files() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path();
@@ -273,6 +323,110 @@ def string_literals_with_comments():
     let filename2 = "test2.py";
     let filename3 = "test3.py";
     let filename4 = "test4.py";
+    
+    let test1_path = dir_path.join(&filename1);
+    let test2_path = dir_path.join(&filename2);
+    let test3_path = dir_path.join(&filename3);
+    let test4_path = dir_path.join(&filename4);
+    
+    fs::write(&test1_path, file1_content).unwrap();
+    fs::write(&test2_path, file2_content).unwrap();
+    fs::write(&test3_path, file3_content).unwrap();
+    fs::write(&test4_path, file4_content).unwrap();
+}
+
+fn create_csharp_test_files(dir_path: &Path) {
+    let file1_content = r###"// This is a comment
+using System;
+
+namespace TestNamespace 
+{
+    public class Program 
+    {
+        /* This is a multi-line comment
+         * that spans multiple lines
+         * and should be removed
+         */
+        public static void Main() 
+        {
+            int x = 5; // End of line comment
+            Console.WriteLine("Hello");
+            string verbatimString = @"This contains // fake comments that should be preserved";
+        }
+    }
+}
+"###;
+    
+    let file2_content = r###"// Another comment
+using System;
+
+namespace TestNamespace 
+{
+    /// <summary>
+    /// XML documentation comment that should be preserved
+    /// </summary>
+    public class Test 
+    {
+        private int _value;
+        private string _name; // aicodeanalyzer: ignore
+        
+        public Test(int value) 
+        {
+            _value = value;
+            _name = "Test"; // This comment should be removed
+        }
+    }
+}
+"###;
+    
+    let file3_content = r###"// This comment will be removed
+using System;
+
+namespace TestNamespace 
+{
+    public static class Utilities 
+    {
+        // aicodeanalyzer: ignore
+        public static int DoSomething(int y) 
+        {
+            /* Another multi-line comment
+             * with indentation
+             */
+            return y * 2;
+        }
+    }
+}
+"###;
+
+    let file4_content = r###"
+using System;
+
+namespace StringTests 
+{
+    public class StringTests 
+    {
+        public void StringLiteralsWithComments() 
+        {
+            string str1 = "This string contains // a comment-like pattern";
+            string str2 = "Anthropic Claude";
+            string str3 = "Multiple // comment // patterns";
+            
+            string verbatimStr = @"This is a verbatim string with // comment pattern
+                and a newline with more // comments
+                and ""quoted text"" inside";
+            
+            string escapedStr = "Escaped quote \\\" and // comment";
+            
+            string formatted = $"Generate code for task: {task}";
+        }
+    }
+}
+"###;
+    
+    let filename1 = "Test1.cs";
+    let filename2 = "Test2.cs";
+    let filename3 = "Test3.cs";
+    let filename4 = "Test4.cs";
     
     let test1_path = dir_path.join(&filename1);
     let test2_path = dir_path.join(&filename2);
