@@ -85,6 +85,19 @@ AI CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze
 
 ## Recent Updates
 
+### Added C#/.NET support to delete-comments command (2025-03-18)
+
+The delete-comments command now supports C#/.NET projects for comment removal.
+
+**Changes made:**
+1. Added C# language option to the delete-comments command
+2. Added proper handling for C# code comments, including XML doc comments
+3. Enhanced string handling to support C# verbatim strings
+4. Added C#-specific test file patterns for proper test file exclusion
+5. Created C# test file to verify functionality
+
+This enhancement allows the delete-comments command to be used with C#/.NET codebases, making the tool more versatile.
+
 ### Fixed delete-comments command to properly ignore test files (2025-03-16)
 
 The delete-comments command now properly ignores test files during processing. 
