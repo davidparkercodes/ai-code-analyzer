@@ -608,7 +608,7 @@ fn delete_file_content(
     
     // Process multi-line comments for C# first
     let content = if is_csharp {
-        remove_multiline_comments(content, comment_count, file_path, stats)
+        remove_multiline_comments(content.to_string(), comment_count, file_path, stats)
     } else {
         content.to_string()
     };
