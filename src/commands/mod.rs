@@ -108,7 +108,7 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: String,
         
-        /// Programming language to clean comments from (supports 'rust', 'python', 'csharp' or 'cs')
+        /// Programming language to clean comments from (supports 'rust', 'python', 'csharp'/'cs', 'typescript'/'ts')
         #[arg(short, long, required = true)]
         language: String,
         

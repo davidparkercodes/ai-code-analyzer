@@ -10,7 +10,7 @@ A high-performance CLI tool built in Rust that analyzes and extracts insights fr
 - Dependency analysis and visualization
 - Circular dependency detection
 - Exclusion of test files from dependency analysis
-- Comment deletion for Rust, Python, and C#/.NET code files
+- Comment deletion for Rust, Python, C#/.NET, and TypeScript code files
 - Export to DOT format for visualizing dependencies with tools like Graphviz
 - Architecture diagram generation in multiple formats (DOT, PlantUML, Mermaid, C4)
 - AI-powered code analysis with multi-provider support
@@ -56,6 +56,7 @@ aicodeanalyzer architecture-diagram /path/to/code --format c4 --focus src/core
 aicodeanalyzer delete-comments /path/to/code --language rust
 aicodeanalyzer delete-comments /path/to/code --language python
 aicodeanalyzer delete-comments /path/to/code --language csharp
+aicodeanalyzer delete-comments /path/to/code --language typescript
 ```
 
 ## Metrics

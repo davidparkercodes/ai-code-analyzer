@@ -36,6 +36,9 @@ impl FileFilter {
         path_str.ends_with(".test.ts") ||
         path_str.ends_with("_spec.js") ||
         path_str.ends_with("_spec.ts") ||
+        path_str.ends_with(".spec.ts") ||
+        path_str.contains("__tests__") ||
+        path_str.contains(".spec/") ||
         path_str.ends_with("_test.py") ||
         path_str.ends_with("test_") ||
         path_str.contains("__tests__") ||

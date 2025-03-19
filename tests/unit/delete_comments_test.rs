@@ -162,6 +162,56 @@ fn test_delete_comments_from_csharp_files() {
 }
 
 #[test]
+fn test_delete_comments_from_typescript_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+    
+    create_typescript_test_files(temp_path);
+    
+    let output_dir = TempDir::new().unwrap();
+    let output_path = output_dir.path().to_str().unwrap().to_string();
+    
+    let exit_code = delete_comments::execute(
+        temp_path.to_str().unwrap().to_string(),
+        "typescript".to_string(),
+        false,
+        Some(output_path.clone()),
+        true,
+        true,
+        true,
+        true
+    );
+    
+    assert_eq!(exit_code, 0);
+    
+    let file1_path = temp_path.join("app.component.ts");
+    let _file2_path = temp_path.join("service.ts");
+    
+    let original_file1 = fs::read_to_string(&file1_path).unwrap();
+    assert!(original_file1.contains("// This is a comment"));
+    assert!(original_file1.contains("/**"));
+    
+    if let Ok(entries) = fs::read_dir(&output_path) {
+        println!("TypeScript files in output directory:");
+        for entry in entries.filter_map(|e| e.ok()) {
+            println!("  {}", entry.path().display());
+            
+            // Verify that comments have been removed in output files
+            if entry.path().extension().unwrap_or_default() == "ts" {
+                let processed_content = fs::read_to_string(entry.path()).unwrap();
+                assert!(!processed_content.contains("// This is a comment"));
+                assert!(!processed_content.contains("/* This is a multi-line comment"));
+                // But JSDoc comments and ignored comments should remain
+                assert!(processed_content.contains("/**"));
+                assert!(processed_content.contains("aicodeanalyzer: ignore"));
+                // Just make sure some code is preserved
+                assert!(processed_content.contains("export class"));
+            }
+        }
+    }
+}
+
+#[test]
 fn test_ignores_test_files() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path();
@@ -437,4 +487,103 @@ namespace StringTests
     fs::write(&test2_path, file2_content).unwrap();
     fs::write(&test3_path, file3_content).unwrap();
     fs::write(&test4_path, file4_content).unwrap();
+}
+
+fn create_typescript_test_files(dir_path: &Path) {
+    let file1_content = r###"// This is a comment
+import { Component } from '@angular/core';
+
+/**
+ * Multi-line comment that should be removed
+ * with multiple lines
+ */
+@Component({
+  selector: 'app-root',
+  template: `
+    <div>
+      <!-- HTML comment that should be preserved -->
+      <h1>{{ title }}</h1>
+      <p>Welcome to {{ title }}!</p>
+    </div>
+  `,
+  styles: [`
+    h1 {
+      color: blue; /* CSS comment that should be preserved */
+    }
+  `]
+})
+export class AppComponent {
+  title = 'TypeScript App'; // End of line comment
+
+  /**
+   * This is a JSDoc comment that should be preserved
+   * @param value - The input value
+   * @returns The processed value
+   */
+  processValue(value: string): string {
+    // This comment should be removed
+    const processed = value.trim(); // Another comment to remove
+
+    /* This is another multi-line comment
+     * that should be removed from the code
+     */
+    return processed;
+  }
+
+  // aicodeanalyzer: ignore
+  ignoredFunction(): void {
+    console.log('This function has an ignored comment');
+  }
+}
+"###;
+    
+    let file2_content = r###"// Another comment in a service file
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+/**
+ * This is a service documentation that should be preserved
+ */
+@Injectable({
+  providedIn: 'root'
+})
+export class DataService {
+  private apiUrl = 'https://api.example.com'; // API URL comment
+
+  constructor(private http: HttpClient) { } // End of line comment
+
+  /**
+   * Get data from the API
+   * @returns Observable of data
+   */
+  getData(): Observable<any[]> {
+    // This comment should be removed
+    return this.http.get<any[]>(`${this.apiUrl}/data`);
+  }
+
+  /* This multi-line comment
+   * should be removed
+   */
+  processData(data: any): any {
+    const template = `This is a template literal with
+      multiple lines and ${data.value} // with comment-like syntax`;
+    return data;
+  }
+
+  // aicodeanalyzer: ignore
+  private logError(error: any): void {
+    console.error('Error occurred:', error);
+  }
+}
+"###;
+    
+    let filename1 = "app.component.ts";
+    let filename2 = "service.ts";
+    
+    let test1_path = dir_path.join(&filename1);
+    let test2_path = dir_path.join(&filename2);
+    
+    fs::write(&test1_path, file1_content).unwrap();
+    fs::write(&test2_path, file2_content).unwrap();
 }
