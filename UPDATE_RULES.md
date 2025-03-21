@@ -85,6 +85,18 @@ AI CodeAnalyzer is a high-performance, Rust-powered CLI tool designed to analyze
 
 ## Recent Updates
 
+### Added Python support to delete-comments command (2025-03-20)
+
+The delete-comments command now properly supports Python projects for comment removal.
+
+**Changes made:**
+1. Enhanced Python language support in the delete-comments command
+2. Added proper handling for Python-specific string patterns including triple quotes (''' and """)
+3. Added proper test files for Python comment deletion
+4. Added support for 'py' as an alias to 'python' language option
+
+This enhancement improves the Python support for the delete-comments command, making the tool more effective for cleaning Python codebases.
+
 ### Added TypeScript support to delete-comments command (2025-03-18)
 
 The delete-comments command now supports TypeScript projects for comment removal.
