@@ -51,9 +51,9 @@ fn execute_delete_comments_command(
     _force: bool,
     dry_run: bool
 ) -> AppResult<()> {
-    if !["rust", "python", "csharp", "cs", "c#", "typescript", "ts"].contains(&language.to_lowercase().as_str()) {
+    if !["rust", "python", "py", "csharp", "cs", "c#", "typescript", "ts"].contains(&language.to_lowercase().as_str()) {
         return Err(to_app_error(
-            format!("Language '{}' is not supported. Currently only 'rust', 'python', 'csharp' (or 'cs'/'c#'), and 'typescript' (or 'ts') are supported.", language),
+            format!("Language '{}' is not supported. Currently only 'rust', 'python' (or 'py'), 'csharp' (or 'cs'/'c#'), and 'typescript' (or 'ts') are supported.", language),
             AppErrorType::Internal
         ));
     }
@@ -428,7 +428,7 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
             "///",
             r"//.*aicodeanalyzer:\s*ignore"
         ),
-        "python" => (
+        "python" | "py" => (
             "py",
             r"#.+$",
             "###",
@@ -654,6 +654,7 @@ fn delete_file_content(
     let is_typescript = !is_python && file_path.ends_with(".ts");
     
     // Process multi-line comments for C# and TypeScript first
+    // For Python, we handle multi-line string literals (""" or ''') as code, not comments
     
     let content = if is_csharp || is_typescript {
         remove_multiline_comments(content_to_process.to_string(), comment_count, file_path, stats)
@@ -904,6 +905,8 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     let mut in_char = false;
     let mut in_template_string = false;
     let mut escape_next = false;
+    let mut in_triple_double_quotes = false;
+    let mut in_triple_single_quotes = false;
     
     // Handle UTF-8 BOM if present (should already be removed at file level, but double-check)
     let line_to_process = if line.starts_with('\u{feff}') {
@@ -935,7 +938,14 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             },
             
             '"' => {
-                if !in_char && !in_template_string {
+                if !in_char && !in_template_string && !in_triple_single_quotes {
+                    // Check for Python triple double quotes
+                    if is_python && i + 2 < length && chars[i+1] == '"' && chars[i+2] == '"' {
+                        in_triple_double_quotes = !in_triple_double_quotes;
+                        // Skip the next two quote characters
+                        continue;
+                    }
+                    
                     // Handle C# verbatim strings @"..."
                     if i > 0 && chars[i-1] == '@' {
                         // For verbatim strings, only " followed by " is an escape sequence
@@ -949,13 +959,20 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             
             '`' => {
                 // Handle TypeScript template literals
-                if !in_char && !in_string {
+                if !in_char && !in_string && !in_triple_double_quotes && !in_triple_single_quotes {
                     in_template_string = !in_template_string;
                 }
             },
             
-            '\'' if !in_string => {
-                in_char = !in_char;
+            '\'' => {
+                if is_python && i + 2 < length && chars[i+1] == '\'' && chars[i+2] == '\'' && !in_string && !in_triple_double_quotes {
+                    // This is a Python triple single quote
+                    in_triple_single_quotes = !in_triple_single_quotes;
+                    // Skip the next two quote characters
+                    continue;
+                } else if !in_string && !in_triple_double_quotes && !in_triple_single_quotes {
+                    in_char = !in_char;
+                }
             },
             
             '/' if !is_python && i + 1 < length && chars[i+1] == '/' && !in_string && !in_char && !in_template_string => {
@@ -966,7 +983,7 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
                 }
             },
             
-            '#' if is_python && !in_string && !in_char => {
+            '#' if is_python && !in_string && !in_char && !in_triple_double_quotes && !in_triple_single_quotes => {
                 let prefix = &line[0..i];
                 if !prefix.trim().is_empty() {
                     comment_pos = Some(i);
