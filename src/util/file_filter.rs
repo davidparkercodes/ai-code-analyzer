@@ -43,7 +43,6 @@ impl FileFilter {
         path_str.ends_with("test_") ||
         path_str.contains("__tests__") ||
         path_str.contains("__test__") ||
-        // C#/.NET specific test patterns
         path_str.ends_with("Tests.cs") ||
         path_str.ends_with("Test.cs") ||
         path_str.contains(".Tests/") ||

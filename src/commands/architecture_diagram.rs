@@ -32,11 +32,9 @@ pub async fn execute(
     info!("Diagram format: {}", format);
     info!("Diagram detail level: {}", detail);
     
-    // Define valid formats and detail levels
     let valid_formats = vec!["dot", "plantuml", "mermaid", "c4", "svg"];
     let valid_detail_levels = vec!["high", "medium", "low"];
     
-    // Validate format
     if !valid_formats.contains(&format.as_str()) {
         error!(
             "Invalid diagram format: {}. Valid formats are: {}",
@@ -46,7 +44,6 @@ pub async fn execute(
         return 1;
     }
     
-    // Validate detail level
     if !valid_detail_levels.contains(&detail.as_str()) {
         error!(
             "Invalid detail level: {}. Valid detail levels are: {}",
@@ -56,28 +53,20 @@ pub async fn execute(
         return 1;
     }
     
-    // Configure file filter settings
     let exclude_tests = !include_tests;
     
-    // Configure parallel processing
     let use_parallel = !no_parallel;
     
-    // Create a dependency graph to analyze relationships
     let mut dependency_graph = DependencyGraph::new();
     
-    // Build dependency graph using the existing analyzer infrastructure
-    // For this example, we'll create a simplified graph for demo purposes
-    // In a real implementation, this would integrate with the actual dependency analyzer
     
     info!("Building dependency graph...");
     
     let path_str = path.to_string_lossy().to_string();
     let is_parallel = use_parallel;
     
-    // Log parallel processing status
     parallel::log_parallel_status(is_parallel);
     
-    // Use the existing file utilities to gather source files with the right filters
     let source_files = match crate::util::file_filter::get_all_source_files(&path_str, is_parallel) {
         Ok(files) => files,
         Err(err) => {
@@ -88,20 +77,15 @@ pub async fn execute(
     
     info!("Found {} source files", source_files.len());
     
-    // Create a naive dependency map based on directory structure for demo
-    // This is a placeholder - the real implementation would use more sophisticated dependency analysis
     for file in &source_files {
         let file_path = file.to_string_lossy().to_string();
         
-        // Skip test files if excluded
         if exclude_tests && FileFilter::is_test_file(file) {
             continue;
         }
         
-        // Add the file as a node
         dependency_graph.add_node(&file_path);
         
-        // Add edges to files in the same directory (simplified demo)
         let parent_dir = file.parent();
         if let Some(dir) = parent_dir {
             for other_file in &source_files {
@@ -109,7 +93,6 @@ pub async fn execute(
                     continue;
                 }
                 
-                // Skip test files if excluded
                 if exclude_tests && FileFilter::is_test_file(other_file) {
                     continue;
                 }
@@ -117,11 +100,8 @@ pub async fn execute(
                 let other_path = other_file.to_string_lossy().to_string();
                 
                 if other_file.parent() == Some(dir) {
-                    // Add the other file as a node
                     dependency_graph.add_node(&other_path);
                     
-                    // Add an edge from this file to the other (arbitrary for demo)
-                    // In a real implementation, we would analyze imports/includes
                     if file_path.len() > other_path.len() {
                         dependency_graph.add_edge(&file_path, &other_path);
                     }
@@ -130,7 +110,6 @@ pub async fn execute(
         }
     }
     
-    // Create a map of all dependencies for diagram generation
     let mut all_dependencies = HashMap::new();
     
     for node in dependency_graph.get_nodes() {
@@ -138,7 +117,6 @@ pub async fn execute(
         all_dependencies.insert(node.clone(), dependencies);
     }
     
-    // Create the diagram based on format
     let diagram_content = match format.as_str() {
         "dot" => {
             generate_dot_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
@@ -153,8 +131,6 @@ pub async fn execute(
             generate_c4_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         "svg" => {
-            // SVG format is generated from DOT, so we first create a DOT diagram
-            // and then convert it to SVG using Graphviz
             generate_svg_diagram(&all_dependencies, &detail, group_by_module, focus.as_deref())
         },
         _ => {
@@ -163,7 +139,6 @@ pub async fn execute(
         }
     };
     
-    // Handle output
     if !no_output {
         let output_file = match output_path {
             Some(custom_path) => PathBuf::from(custom_path),
@@ -195,7 +170,6 @@ pub async fn execute(
             }
         };
         
-        // Create directory if it doesn't exist
         if let Some(parent) = output_file.parent() {
             if !parent.exists() {
                 if let Err(err) = fs::create_dir_all(parent) {
@@ -205,7 +179,6 @@ pub async fn execute(
             }
         }
         
-        // Write diagram to file
         if let Err(err) = fs::write(&output_file, diagram_content) {
             error!("Failed to write diagram to file: {}", err);
             return 1;
@@ -219,14 +192,11 @@ pub async fn execute(
             ))
         );
         
-        // Suggest visualizing the diagram based on format
         suggest_visualization(&format, &output_file);
     } else {
-        // Print diagram to console
         println!("\n{}", diagram_content);
     }
     
-    // Success
     0
 }
 
@@ -252,19 +222,15 @@ fn generate_dot_diagram(
     dot.push_str("  node [shape=box, style=filled, fillcolor=lightblue];\n");
     dot.push_str("  edge [arrowhead=vee];\n\n");
     
-    // Process nodes and edges based on the grouping option
     if group_by_module {
-        // Group nodes by module
         let module_dependencies = group_dependencies_by_module(&dependencies, focus);
         
-        // Create module subgraphs
         for (module, deps) in module_dependencies.iter() {
             dot.push_str(&format!("  subgraph cluster_{} {{\n", sanitize_node_id(module)));
             dot.push_str(&format!("    label=\"{}\";\n", module));
             dot.push_str("    style=filled;\n");
             dot.push_str("    color=lightgrey;\n");
             
-            // Add module files as nodes in the subgraph
             for (from, _) in deps.iter() {
                 let file_name = extract_file_name(from);
                 dot.push_str(&format!("    \"{}\" [label=\"{}\"];\n", sanitize_node_id(from), file_name));
@@ -273,11 +239,9 @@ fn generate_dot_diagram(
             dot.push_str("  }\n");
         }
         
-        // Add edges between nodes
         for (_module, deps) in module_dependencies.iter() {
             for (from, to_list) in deps.iter() {
                 for to in to_list {
-                    // Skip self-references if detail level is low
                     if detail_level == "low" && from == to {
                         continue;
                     }
@@ -291,11 +255,9 @@ fn generate_dot_diagram(
             }
         }
     } else {
-        // Add nodes
         for (from, _) in dependencies.iter() {
             let file_name = extract_file_name(from);
             
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -309,9 +271,7 @@ fn generate_dot_diagram(
             ));
         }
         
-        // Add edges
         for (from, to_list) in dependencies.iter() {
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -319,14 +279,12 @@ fn generate_dot_diagram(
             }
             
             for to in to_list {
-                // Skip if target is not in focus
                 if let Some(focus_path) = focus {
                     if !to.contains(focus_path) {
                         continue;
                     }
                 }
                 
-                // Skip self-references if detail level is low
                 if detail_level == "low" && from == to {
                     continue;
                 }
@@ -354,16 +312,12 @@ fn generate_plantuml_diagram(
     puml.push_str("!theme sketchy-outline\n");
     puml.push_str("skinparam linetype ortho\n\n");
     
-    // Process nodes and edges based on the grouping option
     if group_by_module {
-        // Group nodes by module
         let module_dependencies = group_dependencies_by_module(&dependencies, focus);
         
-        // Create modules as packages
         for (module, deps) in module_dependencies.iter() {
             puml.push_str(&format!("package \"{}\" {{\n", module));
             
-            // Add module files as components
             for (from, _) in deps.iter() {
                 let file_name = extract_file_name(from);
                 puml.push_str(&format!("  component \"{}\" as {}\n", file_name, sanitize_node_id(from)));
@@ -372,11 +326,9 @@ fn generate_plantuml_diagram(
             puml.push_str("}\n\n");
         }
         
-        // Add relationships between components
         for (_, deps) in module_dependencies.iter() {
             for (from, to_list) in deps.iter() {
                 for to in to_list {
-                    // Skip self-references if detail level is low
                     if detail_level == "low" && from == to {
                         continue;
                     }
@@ -390,11 +342,9 @@ fn generate_plantuml_diagram(
             }
         }
     } else {
-        // Add components
         for (from, _) in dependencies.iter() {
             let file_name = extract_file_name(from);
             
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -410,9 +360,7 @@ fn generate_plantuml_diagram(
         
         puml.push_str("\n");
         
-        // Add relationships
         for (from, to_list) in dependencies.iter() {
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -420,14 +368,12 @@ fn generate_plantuml_diagram(
             }
             
             for to in to_list {
-                // Skip if target is not in focus
                 if let Some(focus_path) = focus {
                     if !to.contains(focus_path) {
                         continue;
                     }
                 }
                 
-                // Skip self-references if detail level is low
                 if detail_level == "low" && from == to {
                     continue;
                 }
@@ -453,16 +399,12 @@ fn generate_mermaid_diagram(
 ) -> String {
     let mut mmd = String::from("graph LR\n");
     
-    // Process nodes and edges based on the grouping option
     if group_by_module {
-        // Group nodes by module
         let module_dependencies = group_dependencies_by_module(&dependencies, focus);
         
-        // Create module subgraphs
         for (module, deps) in module_dependencies.iter() {
             mmd.push_str(&format!("  subgraph {}\n", module));
             
-            // Add module files as nodes in the subgraph
             for (from, _) in deps.iter() {
                 let file_name = extract_file_name(from);
                 mmd.push_str(&format!("    {}[\"{}\"]\n", sanitize_node_id(from), file_name));
@@ -471,11 +413,9 @@ fn generate_mermaid_diagram(
             mmd.push_str("  end\n");
         }
         
-        // Add edges between nodes
         for (_, deps) in module_dependencies.iter() {
             for (from, to_list) in deps.iter() {
                 for to in to_list {
-                    // Skip self-references if detail level is low
                     if detail_level == "low" && from == to {
                         continue;
                     }
@@ -489,11 +429,9 @@ fn generate_mermaid_diagram(
             }
         }
     } else {
-        // Add nodes
         for (from, _) in dependencies.iter() {
             let file_name = extract_file_name(from);
             
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -507,9 +445,7 @@ fn generate_mermaid_diagram(
             ));
         }
         
-        // Add edges
         for (from, to_list) in dependencies.iter() {
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -517,14 +453,12 @@ fn generate_mermaid_diagram(
             }
             
             for to in to_list {
-                // Skip if target is not in focus
                 if let Some(focus_path) = focus {
                     if !to.contains(focus_path) {
                         continue;
                     }
                 }
                 
-                // Skip self-references if detail level is low
                 if detail_level == "low" && from == to {
                     continue;
                 }
@@ -551,20 +485,15 @@ fn generate_c4_diagram(
     c4.push_str("!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml\n\n");
     c4.push_str("LAYOUT_WITH_LEGEND()\n\n");
     
-    // Generate system context
     c4.push_str("System_Boundary(system, \"Codebase Architecture\") {\n");
     
-    // Process nodes and edges based on the grouping option
     if group_by_module {
-        // Group nodes by module
         let module_dependencies = group_dependencies_by_module(&dependencies, focus);
         
-        // Create modules as containers
         for (module, deps) in module_dependencies.iter() {
             let module_id = sanitize_node_id(module);
             c4.push_str(&format!("  Container({}Cont, \"{}\") {{\n", module_id, module));
             
-            // Add module files as components
             for (from, _) in deps.iter() {
                 let file_name = extract_file_name(from);
                 let file_id = sanitize_node_id(from);
@@ -574,11 +503,9 @@ fn generate_c4_diagram(
             c4.push_str("  }\n\n");
         }
         
-        // Add relationships between components
         for (_, deps) in module_dependencies.iter() {
             for (from, to_list) in deps.iter() {
                 for to in to_list {
-                    // Skip self-references if detail level is low
                     if detail_level == "low" && from == to {
                         continue;
                     }
@@ -590,11 +517,9 @@ fn generate_c4_diagram(
             }
         }
     } else {
-        // Add components
         for (from, _) in dependencies.iter() {
             let file_name = extract_file_name(from);
             
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -607,9 +532,7 @@ fn generate_c4_diagram(
         
         c4.push_str("\n");
         
-        // Add relationships
         for (from, to_list) in dependencies.iter() {
-            // Skip if not in focus
             if let Some(focus_path) = focus {
                 if !from.contains(focus_path) {
                     continue;
@@ -617,14 +540,12 @@ fn generate_c4_diagram(
             }
             
             for to in to_list {
-                // Skip if target is not in focus
                 if let Some(focus_path) = focus {
                     if !to.contains(focus_path) {
                         continue;
                     }
                 }
                 
-                // Skip self-references if detail level is low
                 if detail_level == "low" && from == to {
                     continue;
                 }
@@ -647,13 +568,10 @@ fn generate_svg_diagram(
     group_by_module: bool,
     focus: Option<&str>,
 ) -> String {
-    // First generate a DOT diagram
     let dot_content = generate_dot_diagram(dependencies, detail_level, group_by_module, focus);
     
-    // Check if Graphviz is installed
     match Command::new("dot").arg("-V").output() {
         Ok(_) => {
-            // Graphviz is installed, use it to convert DOT to SVG
             match convert_dot_to_svg(&dot_content) {
                 Ok(svg) => svg,
                 Err(err) => {
@@ -666,7 +584,6 @@ fn generate_svg_diagram(
             }
         },
         Err(_) => {
-            // Graphviz is not installed
             warn!("Graphviz (dot) is not installed. Cannot generate SVG diagram.");
             let error_svg = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n") +
                 "<svg width=\"500\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
@@ -683,7 +600,6 @@ fn generate_svg_diagram(
 }
 
 fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
-    // Create a dot process
     let mut process = match Command::new("dot")
         .arg("-Tsvg")
         .stdin(Stdio::piped())
@@ -694,15 +610,12 @@ fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
             Err(e) => return Err(format!("Failed to spawn Graphviz: {}", e)),
         };
     
-    // Write DOT content to its stdin
     if let Some(mut stdin) = process.stdin.take() {
         if let Err(e) = stdin.write_all(dot_content.as_bytes()) {
             return Err(format!("Failed to write to Graphviz stdin: {}", e));
         }
-        // stdin will be closed when dropped
     }
     
-    // Get output
     match process.wait_with_output() {
         Ok(output) => {
             if output.status.success() {
@@ -719,7 +632,6 @@ fn convert_dot_to_svg(dot_content: &str) -> Result<String, String> {
     }
 }
 
-// Group dependencies by module path
 fn group_dependencies_by_module(
     dependencies: &HashMap<String, Vec<String>>,
     focus: Option<&str>,
@@ -727,7 +639,6 @@ fn group_dependencies_by_module(
     let mut module_deps: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
     
     for (from, to_list) in dependencies {
-        // Skip if not in focus
         if let Some(focus_path) = focus {
             if !from.contains(focus_path) {
                 continue;
@@ -757,11 +668,9 @@ fn group_dependencies_by_module(
     module_deps
 }
 
-// Extract module name from file path
 fn extract_module_name(file_path: &str) -> String {
     let path = Path::new(file_path);
     
-    // Get parent directory name as module
     if let Some(parent) = path.parent() {
         if let Some(file_name) = parent.file_name() {
             if let Some(name) = file_name.to_str() {
@@ -770,11 +679,9 @@ fn extract_module_name(file_path: &str) -> String {
         }
     }
     
-    // Default module name if extraction fails
     "unknown".to_string()
 }
 
-// Extract file name from path
 fn extract_file_name(file_path: &str) -> String {
     let path = Path::new(file_path);
     
@@ -784,16 +691,13 @@ fn extract_file_name(file_path: &str) -> String {
         }
     }
     
-    // Return path as fallback
     file_path.to_string()
 }
 
-// Sanitize node id for diagram compatibility
 fn sanitize_node_id(id: &str) -> String {
     id.replace(&['.', '/', '\\', ' ', '-'][..], "_")
 }
 
-// Suggest visualization methods based on diagram format
 fn suggest_visualization(format: &str, output_file: &Path) {
     match format {
         "dot" => {
@@ -821,7 +725,6 @@ fn suggest_visualization(format: &str, output_file: &Path) {
             println!("   - Click on File → Import → SVG");
             println!("   - Select the generated SVG file ({})", output_file.display());
             
-            // Check if the file contains an error message
             if let Ok(content) = fs::read_to_string(output_file) {
                 if content.contains("<!-- Failed to generate SVG") {
                     println!("\nNOTE: The SVG generation appears to have encountered an error.");
