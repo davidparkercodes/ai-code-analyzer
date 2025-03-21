@@ -76,7 +76,6 @@ fn execute_delete_comments_command(
     }
     
     if is_git_repo && !dry_run && !no_git {
-        // Check if the repository has an origin remote
         let remote_check = Command::new("git")
             .arg("-C")
             .arg(&path_buf)
@@ -298,7 +297,6 @@ fn handle_git_operations(path: &Path) -> AppResult<()> {
     
     style::print_success("✅ Successfully committed changes to git repository.");
     
-    // Check if the repository has an origin remote
     let remote_check = Command::new("git")
         .arg("-C")
         .arg(path)
@@ -462,7 +460,6 @@ fn delete_comments(directory_path: &str, language: &str, output_dir: Option<&str
         to_app_error(format!("Failed to compile regex: {}", e), AppErrorType::Internal)
     })?;
     
-    // Pattern to match and ignore (already updated with new name)
     let _ignore_pattern_str = r"aicodeanalyzer:\s*ignore";
     
     let output_base = match output_dir {
@@ -641,9 +638,8 @@ fn delete_file_content(
 ) -> String {
     let mut result = String::with_capacity(content.len());
     
-    // Handle UTF-8 BOM if present
     let content_to_process = if content.starts_with('\u{feff}') {
-        &content[3..] // Skip the BOM (3 bytes)
+        &content[3..]
     } else {
         content
     };
@@ -653,8 +649,6 @@ fn delete_file_content(
     let is_csharp = !is_python && file_path.ends_with(".cs");
     let is_typescript = !is_python && file_path.ends_with(".ts");
     
-    // Process multi-line comments for C# and TypeScript first
-    // For Python, we handle multi-line string literals (""" or ''') as code, not comments
     
     let content = if is_csharp || is_typescript {
         remove_multiline_comments(content_to_process.to_string(), comment_count, file_path, stats)
@@ -671,19 +665,16 @@ fn delete_file_content(
             continue;
         }
 
-        // Handle XML documentation comments for C# and TypeScript
         if (is_csharp || is_typescript) && trimmed.starts_with("///") {
             result.push_str(line);
             result.push('\n');
             continue;
         }
-        // Handle JSDoc comments for TypeScript
         else if is_typescript && trimmed.starts_with("/**") {
             result.push_str(line);
             result.push('\n');
             continue;
         }
-        // Handle doc comments for other languages
         else if trimmed.starts_with(doc_comment_prefix) {
             result.push_str(line);
             result.push('\n');
@@ -765,21 +756,18 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
     let mut in_jsdoc_comment = false;
     let mut multiline_comment_start = 0;
     
-    // Handle UTF-8 BOM if present (should be handled at file level, but double-check)
     let has_bom = content.starts_with('\u{feff}');
     
     let chars: Vec<char> = content.chars().collect();
-    let mut i = if has_bom { 1 } else { 0 }; // Skip BOM character if present
+    let mut i = if has_bom { 1 } else { 0 };
     
     while i < chars.len() {
         if in_jsdoc_comment {
-            // For JSDoc comments, we want to preserve them, not delete them
             result.push(chars[i]);
             
-            // Check if we're at the end of the JSDoc comment
             if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '/' {
                 in_jsdoc_comment = false;
-                result.push(chars[i+1]); // Add the closing '/'
+                result.push(chars[i+1]);
                 i += 2;
                 continue;
             }
@@ -788,13 +776,10 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
         }
         
         if in_multiline_comment {
-            // Look for the end of multiline comment
             if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '/' {
-                // Found end of multiline comment
                 in_multiline_comment = false;
                 *comment_count += 1;
                 
-                // Extract the full comment for stats
                 let comment_text = content.chars().skip(multiline_comment_start).take(i + 2 - multiline_comment_start).collect::<String>();
                 stats.deleted_comments.push(DeletedComment {
                     file: file_path.to_string(),
@@ -802,7 +787,7 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
                     comment_removed: comment_text,
                 });
                 
-                i += 2; // Skip both */ characters
+                i += 2;
                 continue;
             }
             i += 1;
@@ -825,7 +810,6 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
             '"' => {
                 if !in_char {
                     if in_verbatim_string {
-                        // In verbatim string, "" is an escape for "
                         if i + 1 < chars.len() && chars[i+1] == '"' {
                             result.push(chars[i]);
                             result.push(chars[i+1]);
@@ -859,16 +843,13 @@ fn remove_multiline_comments(content: String, comment_count: &mut usize, file_pa
             },
             
             '/' if !in_string && !in_char && !in_template_string && i + 1 < chars.len() && chars[i+1] == '*' => {
-                // Check if this is a JSDoc comment (/** ... */)
                 if i + 2 < chars.len() && chars[i+2] == '*' {
-                    // This is a JSDoc comment, preserve it
                     in_jsdoc_comment = true;
                     result.push(chars[i]);
                 } else {
-                    // Found start of regular multiline comment
                     in_multiline_comment = true;
                     multiline_comment_start = i;
-                    i += 2; // Skip both /* characters
+                    i += 2;
                     continue;
                 }
             },
@@ -908,9 +889,8 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     let mut in_triple_double_quotes = false;
     let mut in_triple_single_quotes = false;
     
-    // Handle UTF-8 BOM if present (should already be removed at file level, but double-check)
     let line_to_process = if line.starts_with('\u{feff}') {
-        &line[3..] // Skip the BOM (3 bytes)
+        &line[3..]
     } else {
         line
     };
@@ -939,17 +919,12 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             
             '"' => {
                 if !in_char && !in_template_string && !in_triple_single_quotes {
-                    // Check for Python triple double quotes
                     if is_python && i + 2 < length && chars[i+1] == '"' && chars[i+2] == '"' {
                         in_triple_double_quotes = !in_triple_double_quotes;
-                        // Skip the next two quote characters
                         continue;
                     }
                     
-                    // Handle C# verbatim strings @"..."
                     if i > 0 && chars[i-1] == '@' {
-                        // For verbatim strings, only " followed by " is an escape sequence
-                        // We'll simplify and just toggle the string state
                         in_string = !in_string;
                     } else {
                         in_string = !in_string;
@@ -958,7 +933,6 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             },
             
             '`' => {
-                // Handle TypeScript template literals
                 if !in_char && !in_string && !in_triple_double_quotes && !in_triple_single_quotes {
                     in_template_string = !in_template_string;
                 }
@@ -966,9 +940,7 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
             
             '\'' => {
                 if is_python && i + 2 < length && chars[i+1] == '\'' && chars[i+2] == '\'' && !in_string && !in_triple_double_quotes {
-                    // This is a Python triple single quote
                     in_triple_single_quotes = !in_triple_single_quotes;
-                    // Skip the next two quote characters
                     continue;
                 } else if !in_string && !in_triple_double_quotes && !in_triple_single_quotes {
                     in_char = !in_char;
@@ -997,10 +969,8 @@ fn process_line_preserving_strings(line: &str, comment_regex: &Regex, comment_co
     
     if let Some(pos) = comment_pos {
         *comment_count += 1;
-        // Since we're using line_to_process chars for detection but original line for slicing,
-        // we need to adjust if the original line had a BOM
         let adjusted_pos = if line.starts_with('\u{feff}') && line_to_process != line {
-            pos + 3 // Add BOM length
+            pos + 3
         } else {
             pos
         };
